@@ -1,0 +1,175 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  
+  /* Colores base - fondo claro limpio */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.15 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0 0);
+  
+  /* Color corporativo NEPXA #598BFF como primary */
+  --primary: oklch(0.646 0.145 260.89);
+  --primary-foreground: oklch(1 0 0);
+  
+  /* Secundarios con tonos suaves que complementan el azul */
+  --secondary: oklch(0.96 0.005 260.89);
+  --secondary-foreground: oklch(0.2 0 0);
+  
+  /* Muted con un toque muy sutil del azul corporativo */
+  --muted: oklch(0.96 0.005 260.89);
+  --muted-foreground: oklch(0.45 0.02 260.89);
+  
+  /* Accent manteniendo la coherencia cromática */
+  --accent: oklch(0.95 0.01 260.89);
+  --accent-foreground: oklch(0.2 0 0);
+  
+  /* Destructive rojo pero armonioso */
+  --destructive: oklch(0.577 0.245 27.325);
+  
+  /* Bordes sutiles con un toque del azul corporativo */
+  --border: oklch(0.9 0.01 260.89);
+  --input: oklch(0.9 0.01 260.89);
+  
+  /* Ring usando el color corporativo para focus states */
+  --ring: oklch(0.646 0.145 260.89);
+  
+  /* Paleta de charts usando el color corporativo como base */
+  --chart-1: oklch(0.646 0.145 260.89);  /* NEPXA azul principal */
+  --chart-2: oklch(0.7 0.12 300);        /* Púrpura complementario */
+  --chart-3: oklch(0.55 0.15 220);       /* Azul más oscuro */
+  --chart-4: oklch(0.75 0.1 240);        /* Azul claro */
+  --chart-5: oklch(0.6 0.13 280);        /* Azul-púrpura */
+  
+  /* Sidebar con el tema corporativo */
+  --sidebar: oklch(0.98 0.005 260.89);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.646 0.145 260.89);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.95 0.01 260.89);
+  --sidebar-accent-foreground: oklch(0.2 0 0);
+  --sidebar-border: oklch(0.9 0.01 260.89);
+  --sidebar-ring: oklch(0.646 0.145 260.89);
+}
+
+.dark {
+  /* Fondo oscuro similar al de tu imagen (#0A0A23) */
+  --background: oklch(0.08 0.02 260.89);
+  --foreground: oklch(0.95 0.005 260.89);
+  
+  /* Cards con un toque más claro pero manteniendo el tema oscuro */
+  --card: oklch(0.12 0.02 260.89);
+  --card-foreground: oklch(0.95 0.005 260.89);
+  --popover: oklch(0.12 0.02 260.89);
+  --popover-foreground: oklch(0.95 0.005 260.89);
+  
+  /* Color corporativo más brillante en modo oscuro para mejor contraste */
+  --primary: oklch(0.72 0.15 260.89);
+  --primary-foreground: oklch(0.08 0.02 260.89);
+  
+  /* Secundarios en modo oscuro */
+  --secondary: oklch(0.18 0.02 260.89);
+  --secondary-foreground: oklch(0.95 0.005 260.89);
+  
+  /* Muted oscuro pero coherente */
+  --muted: oklch(0.18 0.02 260.89);
+  --muted-foreground: oklch(0.65 0.02 260.89);
+  
+  /* Accent oscuro */
+  --accent: oklch(0.2 0.03 260.89);
+  --accent-foreground: oklch(0.95 0.005 260.89);
+  
+  /* Destructive adaptado al modo oscuro */
+  --destructive: oklch(0.65 0.2 25);
+  
+  /* Bordes sutiles en modo oscuro */
+  --border: oklch(0.25 0.02 260.89);
+  --input: oklch(0.25 0.02 260.89);
+  
+  /* Ring más brillante en modo oscuro */
+  --ring: oklch(0.72 0.15 260.89);
+  
+  /* Chart colors optimizados para modo oscuro */
+  --chart-1: oklch(0.72 0.15 260.89);   /* NEPXA azul brillante */
+  --chart-2: oklch(0.75 0.13 300);      /* Púrpura brillante */
+  --chart-3: oklch(0.6 0.18 220);       /* Azul oscuro brillante */
+  --chart-4: oklch(0.8 0.12 240);       /* Azul claro brillante */
+  --chart-5: oklch(0.65 0.16 280);      /* Azul-púrpura brillante */
+  
+  /* Sidebar en modo oscuro */
+  --sidebar: oklch(0.1 0.02 260.89);
+  --sidebar-foreground: oklch(0.95 0.005 260.89);
+  --sidebar-primary: oklch(0.72 0.15 260.89);
+  --sidebar-primary-foreground: oklch(0.08 0.02 260.89);
+  --sidebar-accent: oklch(0.2 0.03 260.89);
+  --sidebar-accent-foreground: oklch(0.95 0.005 260.89);
+  --sidebar-border: oklch(0.25 0.02 260.89);
+  --sidebar-ring: oklch(0.72 0.15 260.89);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  /* Estilos adicionales para mejorar la cohesión visual */
+  .nepxa-gradient {
+    background: linear-gradient(135deg, oklch(0.646 0.145 260.89) 0%, oklch(0.72 0.13 280) 100%);
+  }
+  
+  .nepxa-text-gradient {
+    background: linear-gradient(135deg, oklch(0.646 0.145 260.89) 0%, oklch(0.72 0.13 280) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
