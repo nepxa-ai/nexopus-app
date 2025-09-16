@@ -5,6 +5,9 @@ import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
 
+import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
+import { toast } from "sonner"
+
 function Drawer({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
@@ -121,6 +124,49 @@ function DrawerDescription({
   )
 }
 
+function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+  const isMobile = useIsMobile()
+
+  return (
+    <Drawer direction={isMobile ? "bottom" : "right"}>
+      <DrawerTrigger asChild>
+        <Button variant="link" className="text-foreground w-fit px-0 text-left">
+          {item.header}
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader className="gap-1">
+          <DrawerTitle>{item.header}</DrawerTitle>
+          <DrawerDescription>Detalle atención</DrawerDescription>
+        </DrawerHeader>
+
+        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
+          {/* Aquí va el formulario correcto según item.type */}
+          <CaseFormRouter
+            item={item as unknown as CaseItem}
+            onSubmit={(payload) => {
+              // TODO: persistir (fetch/axios)
+              // console.log("Guardar", payload)
+              toast.success("Guardado")
+            }}
+          />
+        </div>
+
+        <DrawerFooter>
+          <DrawerClose asChild>
+            <Button variant="outline">Cerrar</Button>
+            {/*<div className="flex justify-end"><Button type="submit">Guardar</Button></div>
+            */}
+            <Button variant="outline">Cerrar</Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  )
+}
+
+
+
 export {
   Drawer,
   DrawerPortal,
@@ -132,4 +178,5 @@ export {
   DrawerFooter,
   DrawerTitle,
   DrawerDescription,
+  TableCellViewer
 }

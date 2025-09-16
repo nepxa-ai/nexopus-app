@@ -1,6 +1,11 @@
 "use client"
 
 import * as React from "react"
+import { z } from "zod"
+import { toast } from "sonner"
+
+import { fetchWebhookEvents, type PaginatedWebhooks, type WebhookEvent } from "@/lib/api-webhooks"
+
 import {
   closestCenter,
   DndContext,
@@ -20,20 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import {
-  IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconCircleCheckFilled,
-  IconDotsVertical,
-  IconGripVertical,
-  IconLayoutColumns,
-  IconLoader,
-  IconPlus,
-  IconTrendingUp,
-} from "@tabler/icons-react"
+
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -49,19 +41,19 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import { toast } from "sonner"
-import { z } from "zod"
 
-import { useIsMobile } from "@/hooks/use-mobile"
+import {
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+  IconGripVertical,
+  IconLayoutColumns,
+} from "@tabler/icons-react"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Drawer,
@@ -77,8 +69,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -99,29 +89,99 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 
-export const schema = z.object({
-  id: z.number(),
-  header: z.string(),
-  type: z.string(),
-  status: z.string(),
-  target: z.string(),
-  limit: z.string(),
-  reviewer: z.string(),
+// ============================
+// Utils: formato fechas y duración
+// ============================
+const TZ = "America/Bogota"
+const dtf = new Intl.DateTimeFormat("es-CO", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: TZ,
 })
 
-// Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  })
+function fmtDT(value?: string | null) {
+  if (!value) return "—"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return "—"
+  return dtf.format(d)
+}
 
+function secondsToHMS(total?: number | null) {
+  const s = Math.max(0, Number(total ?? 0) | 0)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`
+}
+
+// ============================
+//
+// Schema alineado con tu API
+//
+// ============================
+const schema = z.object({
+  id: z.number(),
+  id_dialvox_: z.number().nullable(),
+  id_llamada: z.string().nullable(),
+  phone: z.string().nullable(),
+  duration_sec: z.number().nullable(),
+  nombre_cliente: z.string().nullable(),
+  numero_caso: z.string().nullable(),
+  estado_caso: z.string().nullable(),
+  tipo_solicitud: z.string().nullable(),
+  es_vip: z.boolean().nullable(),
+  empresa_cliente: z.string().nullable(),
+  correo_cliente: z.string().nullable(),
+  producto: z.string().nullable(),
+  servicio: z.string().nullable(),
+  prioridad: z.number().nullable(),
+  en_horario: z.boolean().nullable(),
+  extracted_variables: z.any().nullable(),
+  contratos_empresa: z.any().nullable(),
+  transcript_text: z.string().nullable(),
+  recording_url: z.string().nullable(),
+  transcript_url: z.string().nullable(),
+  started_at: z.string().nullable(),
+  ended_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+type RowType = z.infer<typeof schema>
+
+// ============================
+// Filtros custom
+// ============================
+type DateRange = { from?: string; to?: string }
+
+const dateRangeFilter = (row: any, columnId: string, value?: DateRange) => {
+  if (!value || (!value.from && !value.to)) return true
+  const cell = row.original?.[columnId]
+  const ts = cell ? new Date(cell).getTime() : NaN
+  if (Number.isNaN(ts)) return false
+  const fromOk = value.from ? ts >= new Date(value.from).getTime() : true
+  const toOk = value.to ? ts <= new Date(value.to).getTime() : true
+  return fromOk && toOk
+}
+
+const booleanTriStateFilter = (
+  row: any,
+  columnId: string,
+  value?: "all" | "true" | "false"
+) => {
+  if (!value || value === "all") return true
+  const cell = row.original?.[columnId]
+  const bool = Boolean(cell)
+  return value === "true" ? bool : !bool
+}
+
+// ============================
+// Drag handle
+// ============================
+function DragHandle({ id }: { id: number }) {
+  const { attributes, listeners } = useSortable({ id })
   return (
     <Button
       {...attributes}
@@ -129,6 +189,7 @@ function DragHandle({ id }: { id: number }) {
       variant="ghost"
       size="icon"
       className="text-muted-foreground size-7 hover:bg-transparent"
+      title="Arrastrar para reordenar"
     >
       <IconGripVertical className="text-muted-foreground size-3" />
       <span className="sr-only">Drag to reorder</span>
@@ -136,12 +197,99 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+// ============================
+// Drawer simple de detalle
+// ============================
+function IdAtencionCell({ item }: { item: RowType }) {
+  const headerText =
+    (item.id_dialvox_ != null ? String(item.id_dialvox_) : null) ??
+    item.id_llamada ??
+    "—"
+
+  return (
+    <Drawer>
+      <DrawerTrigger asChild>
+        <Button variant="link" className="text-foreground w-fit px-0 text-left">
+          {headerText}
+        </Button>
+      </DrawerTrigger>
+
+      <DrawerContent>
+        <DrawerHeader className="gap-1">
+          <DrawerTitle>{headerText}</DrawerTitle>
+          <DrawerDescription>Detalle atención</DrawerDescription>
+        </DrawerHeader>
+
+        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">Inicio</span>
+              <span className="font-medium">{fmtDT(item.started_at)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">Fin</span>
+              <span className="font-medium">{fmtDT(item.ended_at)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">Duración</span>
+              <span className="font-medium">{secondsToHMS(item.duration_sec)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">Creado</span>
+              <span className="font-medium">{fmtDT(item.created_at)}</span>
+            </div>
+          </div>
+
+          {item.recording_url ? (
+            <div className="mt-1">
+              <a
+                href={item.recording_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline underline-offset-4"
+              >
+                Ver/escuchar grabación
+              </a>
+            </div>
+          ) : null}
+
+          <Separator />
+          <div className="grid gap-2">
+            <div className="text-xs text-muted-foreground">Cliente</div>
+            <div className="font-medium">{item.nombre_cliente ?? "—"}</div>
+          </div>
+
+          <Separator />
+          <div className="grid gap-2">
+            <div className="text-xs text-muted-foreground">Transcript</div>
+            <div className="text-muted-foreground">{item.transcript_text ?? "—"}</div>
+          </div>
+        </div>
+
+        <DrawerFooter>
+          <DrawerClose asChild>
+            <Button variant="outline">Cerrar</Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  )
+}
+
+// ============================
+// Columnas (orden solicitado)
+// ============================
+const columns: ColumnDef<RowType>[] = [
+  // Drag
   {
     id: "drag",
     header: () => null,
     cell: ({ row }) => <DragHandle id={row.original.id} />,
+    enableHiding: false,
+    enableSorting: false,
   },
+
+  // Checkbox selección
   {
     id: "select",
     header: ({ table }) => (
@@ -151,8 +299,8 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             table.getIsAllPageRowsSelected() ||
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+          aria-label="Seleccionar todos"
         />
       </div>
     ),
@@ -160,160 +308,339 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       <div className="flex items-center justify-center">
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          onCheckedChange={(v) => row.toggleSelected(!!v)}
+          aria-label="Seleccionar fila"
         />
       </div>
     ),
     enableSorting: false,
     enableHiding: false,
   },
+
+  // 1) Id atención (id_dialvox_)
   {
-    accessorKey: "header",
-    header: "Id Caso",
-    cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
-    },
+    id: "id_atencion",
+    header: "Id atención",
+    accessorFn: (row) => (row.id_dialvox_ != null ? String(row.id_dialvox_) : "—"),
+    cell: ({ row }) => <IdAtencionCell item={row.original} />,
     enableHiding: false,
   },
+
+  // 2) Tipo de solictud
   {
-    accessorKey: "type",
-    header: "Tipo de Caso",
-    cell: ({ row }) => (
-      <div className="w-32">
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.type}
-        </Badge>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "Estado",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === "Done" ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : (
-          <IconLoader />
-        )}
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "target",
-    header: () => <div className="w-full text-right">Target</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "limit",
-    header: () => <div className="w-full text-right">Limit</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "reviewer",
-    header: "Reviewer",
+    accessorKey: "tipo_solicitud",
+    header: "Tipo de solictud",
     cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
-
-      if (isAssigned) {
-        return row.original.reviewer
-      }
-
+      const t = row.original.tipo_solicitud ?? "—"
       return (
-        <>
-          <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-            Reviewer
-          </Label>
-          <Select>
-            <SelectTrigger
-              className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
-              id={`${row.original.id}-reviewer`}
-            >
-              <SelectValue placeholder="Assign reviewer" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-              <SelectItem value="Jamik Tashpulatov">
-                Jamik Tashpulatov
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </>
+        <Badge variant="outline" className="text-muted-foreground px-1.5">
+          {t}
+        </Badge>
       )
     },
   },
+
+  // 3) Estado (en blanco)
   {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    id: "estado",
+    header: "Estado",
+    cell: () => <span className="text-muted-foreground">—</span>,
+  },
+
+  // 4) Gestor Asignado (en blanco)
+  {
+    id: "gestor_asignado",
+    header: "Gestor Asignado",
+    cell: () => <span className="text-muted-foreground">—</span>,
+  },
+
+  // ——— Complementarias ———
+  { accessorKey: "id_llamada", header: "id_llamada" },
+  { accessorKey: "phone", header: "phone" },
+  {
+    accessorKey: "duration_sec",
+    header: "duration_sec",
+    cell: ({ row }) => <span>{secondsToHMS(row.original.duration_sec)}</span>,
+  },
+  { accessorKey: "nombre_cliente", header: "nombre_cliente" },
+  { accessorKey: "empresa_cliente", header: "empresa_cliente" },
+  {
+    accessorKey: "es_vip",
+    header: "es_vip",
+    filterFn: "booleanTri",
+    cell: ({ row }) =>
+      row.original.es_vip ? (
+        <Badge variant="secondary">VIP</Badge>
+      ) : (
+        <span className="text-muted-foreground">No</span>
+      ),
+  },
+  {
+    accessorKey: "en_horario",
+    header: "en_horario",
+    filterFn: "booleanTri",
+    cell: ({ row }) =>
+      row.original.en_horario ? (
+        <Badge variant="outline">En horario</Badge>
+      ) : (
+        <span className="text-muted-foreground">Fuera de horario</span>
+      ),
+  },
+  {
+    accessorKey: "extracted_variables",
+    header: "extracted_variables",
+    cell: ({ row }) => {
+      const v = row.original.extracted_variables
+      const text =
+        v == null
+          ? "—"
+          : typeof v === "string"
+          ? v
+          : (() => {
+              try {
+                return JSON.stringify(v)
+              } catch {
+                return String(v)
+              }
+            })()
+      return <span className="line-clamp-2 break-all text-xs">{text}</span>
+    },
+  },
+  {
+    accessorKey: "transcript_text",
+    header: "transcript_text",
+    cell: ({ row }) => (
+      <span className="line-clamp-2 text-xs text-muted-foreground">
+        {row.original.transcript_text ?? "—"}
+      </span>
     ),
+  },
+  {
+    accessorKey: "recording_url",
+    header: "recording_url",
+    cell: ({ row }) =>
+      row.original.recording_url ? (
+        <a
+          href={row.original.recording_url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
+          abrir
+        </a>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
+  {
+    accessorKey: "transcript_url",
+    header: "transcript_url",
+    cell: ({ row }) =>
+      row.original.transcript_url ? (
+        <a
+          href={row.original.transcript_url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
+          abrir
+        </a>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
+  {
+    accessorKey: "started_at",
+    header: "started_at",
+    cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.started_at)}</span>,
+    sortingFn: (a, b) =>
+      (new Date(a.original.started_at || 0).getTime() || 0) -
+      (new Date(b.original.started_at || 0).getTime() || 0),
+    filterFn: "dateRange",
+  },
+  {
+    accessorKey: "ended_at",
+    header: "ended_at",
+    cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.ended_at)}</span>,
+    sortingFn: (a, b) =>
+      (new Date(a.original.ended_at || 0).getTime() || 0) -
+      (new Date(b.original.ended_at || 0).getTime() || 0),
+  },
+  {
+    accessorKey: "created_at",
+    header: "created_at",
+    cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.created_at)}</span>,
+    sortingFn: (a, b) =>
+      (new Date(a.original.created_at || 0).getTime() || 0) -
+      (new Date(b.original.created_at || 0).getTime() || 0),
+  },
+
+  // Columna oculta para búsqueda global
+  {
+    id: "search",
+    header: "search",
+    accessorFn: (row) =>
+      [
+        row.id_dialvox_ != null ? String(row.id_dialvox_) : "",
+        row.id_llamada,
+        row.phone,
+        row.nombre_cliente,
+        row.tipo_solicitud,
+        row.empresa_cliente,
+        row.transcript_text,
+        typeof row.extracted_variables === "string"
+          ? row.extracted_variables
+          : JSON.stringify(row.extracted_variables ?? ""),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    filterFn: "includesString",
+    enableSorting: false,
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+// ============================
+// Toolbar (filtros locales + filtros API opcionales)
+// ============================
+function Toolbar({
+  table,
+  serverFilters,
+  onServerFilters,
+  showServerFilters,
+}: {
+  table: ReturnType<typeof useReactTable<RowType>>
+  serverFilters: { phone?: string; id_llamada?: string }
+  onServerFilters: (v: { phone?: string; id_llamada?: string }) => void
+  showServerFilters?: boolean
+}) {
+  const searchCol = table.getColumn("search")
+  const startedCol = table.getColumn("started_at")
+  const vipCol = table.getColumn("es_vip")
+  const horarioCol = table.getColumn("en_horario")
+
+  return (
+    <div className="w-full flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-4 lg:px-6">
+      <div className="flex flex-col gap-2 w-full lg:max-w-[760px]">
+        <Input
+          placeholder="Buscar (cliente, teléfono, transcript, id)… (local)"
+          onChange={(e) => {
+            const val = e.target.value?.toLowerCase()
+            searchCol?.setFilterValue(val || undefined)
+          }}
+        />
+        {showServerFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Input
+              placeholder="Filtro API por phone (E.164)"
+              value={serverFilters.phone ?? ""}
+              onChange={(e) => onServerFilters({ ...serverFilters, phone: e.target.value || undefined })}
+            />
+            <Input
+              placeholder="Filtro API por id_llamada"
+              value={serverFilters.id_llamada ?? ""}
+              onChange={(e) => onServerFilters({ ...serverFilters, id_llamada: e.target.value || undefined })}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="from" className="text-sm font-medium">Desde</Label>
+          <Input
+            id="from"
+            type="datetime-local"
+            className="h-8 w-48"
+            onChange={(e) => {
+              const prev = (startedCol?.getFilterValue() as DateRange) || {}
+              startedCol?.setFilterValue({
+                ...prev,
+                from: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+              })
+            }}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="to" className="text-sm font-medium">Hasta</Label>
+          <Input
+            id="to"
+            type="datetime-local"
+            className="h-8 w-48"
+            onChange={(e) => {
+              const prev = (startedCol?.getFilterValue() as DateRange) || {}
+              startedCol?.setFilterValue({
+                ...prev,
+                to: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+              })
+            }}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">VIP</Label>
+          <Select defaultValue="all" onValueChange={(val) => vipCol?.setFilterValue(val as any)}>
+            <SelectTrigger className="h-8 w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="true">Solo VIP</SelectItem>
+              <SelectItem value="false">No VIP</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">Horario</Label>
+          <Select defaultValue="all" onValueChange={(val) => horarioCol?.setFilterValue(val as any)}>
+            <SelectTrigger className="h-8 w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="true">En horario</SelectItem>
+              <SelectItem value="false">Fuera de horario</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <IconLayoutColumns />
+              <span className="hidden lg:inline">Vista Columnas</span>
+              <span className="lg:hidden">Columnas</span>
+              <IconChevronDown />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {table
+              .getAllColumns()
+              .filter((column) => typeof column.accessorFn !== "undefined" && column.getCanHide())
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  className="capitalize"
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                >
+                  {column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+// ============================
+// Fila draggable
+// ============================
+function DraggableRow({ row }: { row: Row<RowType> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
+    id: row.original.id as UniqueIdentifier,
   })
 
   return (
@@ -322,38 +649,70 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
       data-dragging={isDragging}
       ref={setNodeRef}
       className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
+        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
       ))}
     </TableRow>
   )
 }
 
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
-  const [data, setData] = React.useState(() => initialData)
+// ============================
+// Componente principal (default)
+// ============================
+export default function DataTable() {
+  const [pageIndex, setPageIndex] = React.useState(0) // 0-based
+  const [pageSize, setPageSize] = React.useState(10)
+
+  // filtros que van al backend (opcionales)
+  const [serverFilters, setServerFilters] = React.useState<{ phone?: string; id_llamada?: string }>({})
+
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [page, setPage] = React.useState<PaginatedWebhooks | null>(null)
+
+  React.useEffect(() => {
+    let abort = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await fetchWebhookEvents({
+          page: pageIndex + 1, // backend 1-based
+          page_size: pageSize,
+          phone: serverFilters.phone,
+          id_llamada: serverFilters.id_llamada,
+        })
+        if (!abort) setPage(res)
+      } catch (e: any) {
+        if (!abort) {
+          setError(e?.message ?? "Error cargando eventos")
+          toast.error("No se pudo cargar eventos")
+        }
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    })()
+    return () => {
+      abort = true
+    }
+  }, [pageIndex, pageSize, serverFilters])
+
+  const items: RowType[] = React.useMemo(() => {
+    const src = page?.items ?? []
+    return src.map((it) => {
+      const parsed = schema.safeParse(it)
+      if (parsed.success) return parsed.data
+      return { ...it, id: Number(it.id) } as RowType
+    })
+  }, [page])
+
   const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({ search: false })
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
-  const sortableId = React.useId()
+
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
     useSensor(TouchSensor, {}),
@@ -361,120 +720,76 @@ export function DataTable({
   )
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data]
+    () => items?.map(({ id }) => id) || [],
+    [items]
   )
 
   const table = useReactTable({
-    data,
+    data: items,
     columns,
     state: {
       sorting,
       columnVisibility,
       rowSelection,
       columnFilters,
-      pagination,
+      pagination: { pageIndex, pageSize },
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => String(row.id),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onPaginationChange: setPagination,
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex, pageSize })
+          : updater
+      setPageIndex(next.pageIndex)
+      setPageSize(next.pageSize)
+    },
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: getFilteredRowModel(), // locales
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    filterFns: {
+      dateRange: dateRangeFilter,
+      booleanTri: booleanTriStateFilter,
+      includesString: (row, columnId, filterValue) => {
+        if (!filterValue) return true
+        const v = String(row.getValue(columnId) ?? "").toLowerCase()
+        return v.includes(String(filterValue).toLowerCase())
+      },
+    },
+    manualPagination: true, // usamos paginación del servidor
+    pageCount: page ? Math.ceil(page.total / page.page_size) : -1,
   })
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
-      })
+      const oldIndex = dataIds.indexOf(active.id)
+      const newIndex = dataIds.indexOf(over.id)
+      const newOrder = arrayMove(items, oldIndex, newIndex)
+      toast.success("Reordenado localmente")
+      // refresca la tabla con el nuevo orden local (no persistimos)
+      table.options.data = newOrder as any
+      table.resetRowSelection()
     }
   }
 
   return (
-    <Tabs
-      defaultValue="outline"
-      className="w-full flex-col justify-start gap-6"
-    >
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="view-selector" className="sr-only">
-          View
-        </Label>
-        <Select defaultValue="outline">
-          <SelectTrigger
-            className="flex w-fit @4xl/main:hidden"
-            size="sm"
-            id="view-selector"
-          >
-            <SelectValue placeholder="Select a view" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="outline">Outline</SelectItem>
-            <SelectItem value="past-performance">Past Performance</SelectItem>
-            <SelectItem value="key-personnel">Key Personnel</SelectItem>
-            <SelectItem value="focus-documents">Focus Documents</SelectItem>
-          </SelectContent>
-        </Select>
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-        </TabsList>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm">
-            <IconPlus />
-            <span className="hidden lg:inline">Add Section</span>
-          </Button>
-        </div>
-      </div>
+    <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
+      {/* Toolbar con filtros locales y filtros API */}
+      <Toolbar
+        table={table}
+        serverFilters={serverFilters}
+        onServerFilters={setServerFilters}
+        showServerFilters
+      />
+
       <TabsContent
         value="outline"
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
@@ -485,44 +800,45 @@ export function DataTable({
             modifiers={[restrictToVerticalAxis]}
             onDragEnd={handleDragEnd}
             sensors={sensors}
-            id={sortableId}
           >
             <Table>
               <TableHeader className="bg-muted sticky top-0 z-10">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 ))}
               </TableHeader>
+
               <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
-                  >
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      Cargando…
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-600">
+                      {error}
+                    </TableCell>
+                  </TableRow>
+                ) : table.getRowModel().rows?.length ? (
+                  <SortableContext items={dataIds} strategy={verticalListSortingStrategy}>
                     {table.getRowModel().rows.map((row) => (
                       <DraggableRow key={row.id} row={row} />
                     ))}
                   </SortableContext>
                 ) : (
                   <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      No results.
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      Sin resultados.
                     </TableCell>
                   </TableRow>
                 )}
@@ -530,279 +846,87 @@ export function DataTable({
             </Table>
           </DndContext>
         </div>
+
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
+            {table.getFilteredSelectedRowModel().rows.length} de{" "}
+            {table.getFilteredRowModel().rows.length} filas(s) seleccionadas.
           </div>
+
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                Rows per page
+                Filas por página
               </Label>
               <Select
-                value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => {
-                  table.setPageSize(Number(value))
-                }}
+                value={`${pageSize}`}
+                onValueChange={(value) => setPageSize(Number(value))}
               >
                 <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
+                  <SelectValue placeholder={pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                      {pageSize}
+                  {[10, 20, 30, 40, 50].map((ps) => (
+                    <SelectItem key={ps} value={`${ps}`}>
+                      {ps}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+              Página {pageIndex + 1} de {table.getPageCount() || 1}
             </div>
+
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
                 variant="outline"
                 className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => setPageIndex(0)}
+                disabled={pageIndex === 0}
               >
-                <span className="sr-only">Go to first page</span>
+                <span className="sr-only">Primera página</span>
                 <IconChevronsLeft />
               </Button>
               <Button
                 variant="outline"
                 className="size-8"
                 size="icon"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                disabled={pageIndex === 0}
               >
-                <span className="sr-only">Go to previous page</span>
+                <span className="sr-only">Página anterior</span>
                 <IconChevronLeft />
               </Button>
               <Button
                 variant="outline"
                 className="size-8"
                 size="icon"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
+                onClick={() => setPageIndex((p) => p + 1)}
+                disabled={!!page && (page.page * page.page_size >= page.total)}
               >
-                <span className="sr-only">Go to next page</span>
+                <span className="sr-only">Página siguiente</span>
                 <IconChevronRight />
               </Button>
               <Button
                 variant="outline"
                 className="hidden size-8 lg:flex"
                 size="icon"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
+                onClick={() => {
+                  if (!page) return
+                  const last = Math.max(0, Math.ceil(page.total / page.page_size) - 1)
+                  setPageIndex(last)
+                }}
+                disabled={!page || page.total === 0}
               >
-                <span className="sr-only">Go to last page</span>
+                <span className="sr-only">Última página</span>
                 <IconChevronsRight />
               </Button>
             </div>
           </div>
         </div>
       </TabsContent>
-      <TabsContent
-        value="past-performance"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
     </Tabs>
-  )
-}
-
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-]
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig
-
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-  const isMobile = useIsMobile()
-
-  return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.header}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.header}</DrawerTitle>
-          <DrawerDescription>
-            Detalle Caso
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          {!isMobile && (
-            <>
-            {/*
-              <ChartContainer config={chartConfig}>
-                <AreaChart
-                  accessibilityLayer
-                  data={chartData}
-                  margin={{
-                    left: 0,
-                    right: 10,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                    hide
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Area
-                    dataKey="mobile"
-                    type="natural"
-                    fill="var(--color-mobile)"
-                    fillOpacity={0.6}
-                    stroke="var(--color-mobile)"
-                    stackId="a"
-                  />
-                  <Area
-                    dataKey="desktop"
-                    type="natural"
-                    fill="var(--color-desktop)"
-                    fillOpacity={0.4}
-                    stroke="var(--color-desktop)"
-                    stackId="a"
-                  />
-                </AreaChart>
-              </ChartContainer> */}
-              <Separator />
-              <div className="grid gap-2">
-                <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
-                </div>
-                <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
-                </div>
-              </div>
-              <Separator />
-            </>
-          )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Id Caso</Label>
-              <Input id="header" defaultValue={item.header} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Tipo Caso</Label>
-                <Select defaultValue={item.type}>
-                  <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table of Contents">
-                      Table of Contents
-                    </SelectItem>
-                    <SelectItem value="Executive Summary">
-                      Executive Summary
-                    </SelectItem>
-                    <SelectItem value="Technical Approach">
-                      Technical Approach
-                    </SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Capabilities">Capabilities</SelectItem>
-                    <SelectItem value="Focus Documents">
-                      Focus Documents
-                    </SelectItem>
-                    <SelectItem value="Narrative">Narrative</SelectItem>
-                    <SelectItem value="Cover Page">Cover Page</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Estado</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.reviewer}>
-                <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select a reviewer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                  <SelectItem value="Jamik Tashpulatov">
-                    Jamik Tashpulatov
-                  </SelectItem>
-                  <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
-        </div>
-        <DrawerFooter>
-          <Button>Submit</Button>
-          <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
   )
 }

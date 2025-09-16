@@ -81,11 +81,11 @@
   --ring: oklch(0.646 0.145 260.89);
   
   /* Paleta de charts usando el color corporativo como base */
-  --chart-1: oklch(0.646 0.145 260.89);  /* NEPXA azul principal */
-  --chart-2: oklch(0.7 0.12 300);        /* Púrpura complementario */
-  --chart-3: oklch(0.55 0.15 220);       /* Azul más oscuro */
-  --chart-4: oklch(0.75 0.1 240);        /* Azul claro */
-  --chart-5: oklch(0.6 0.13 280);        /* Azul-púrpura */
+  --chart-1: oklch(0.72 0.15 260.89);   /* NEPXA azul brillante */
+  --chart-2: oklch(0.6 0.25748 29.198);      /* Rojo brillante */
+  --chart-3: oklch(0.6 0.09924 144.947);       /* Azul oscuro brillante */
+  --chart-4: oklch(0.8 0.16806 85.615);       /* Azul claro brillante */
+  --chart-5: oklch(0.65 0.16 280);      /* Azul-púrpura brillante */
   
   /* Sidebar con el tema corporativo */
   --sidebar: oklch(0.98 0.005 260.89);
@@ -137,9 +137,9 @@
   
   /* Chart colors optimizados para modo oscuro */
   --chart-1: oklch(0.72 0.15 260.89);   /* NEPXA azul brillante */
-  --chart-2: oklch(0.75 0.13 300);      /* Púrpura brillante */
-  --chart-3: oklch(0.6 0.18 220);       /* Azul oscuro brillante */
-  --chart-4: oklch(0.8 0.12 240);       /* Azul claro brillante */
+  --chart-2: oklch(0.6 0.25748 29.198);      /* Rojo brillante */
+  --chart-3: oklch(0.6 0.09924 144.947);       /* Azul oscuro brillante */
+  --chart-4: oklch(0.8 0.16806 85.615);       /* Azul claro brillante */
   --chart-5: oklch(0.65 0.16 280);      /* Azul-púrpura brillante */
   
   /* Sidebar en modo oscuro */

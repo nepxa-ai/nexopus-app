@@ -1,7 +1,8 @@
+
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
@@ -30,7 +31,7 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
 
-export const description = "An interactive area chart"
+export const description = "Stacked bar chart interactivo"
 
 const chartData = [
   { date: "2024-04-01", incidentes: 222, requerimiento: 150, fpqrs: 100, consulta_caso: 98 },
@@ -129,46 +130,25 @@ const chartData = [
 ];
 
 const chartConfig = {
-  visitors: {
-    label: "Casos atendidos e Inyectados en ",
-  },
-  incidentes: {
-    label: "Incidentes",
-    color: "var(--chart-1)",
-  },
-  requerimiento: {
-    label: "Requerimientos",
-    color: "var(--chart-1)",
-  },
-  fpqrs: {
-    label: "FPQRS",
-    color: "var(--chart-3)",
-  },
-  consulta_caso: {
-    label: "Consulta Caso",
-    color: "var(--chart-4)",
-  },
+  visitors: { label: "Casos atendidos e Inyectados en " },
+  incidentes: { label: "Incidentes", color: "var(--chart-1)" },
+  requerimiento: { label: "Requerimientos", color: "var(--chart-2)" },
+  fpqrs: { label: "FPQRS", color: "var(--chart-3)" },
+  consulta_caso: { label: "Consulta Caso", color: "var(--chart-4)" },
 } satisfies ChartConfig
 
-export function ChartAreaInteractive() {
+export function ChartBarStacked() {
   const isMobile = useIsMobile()
   const [timeRange, setTimeRange] = React.useState("90d")
 
   React.useEffect(() => {
-    if (isMobile) {
-      setTimeRange("7d")
-    }
+    if (isMobile) setTimeRange("7d")
   }, [isMobile])
 
   const filteredData = chartData.filter((item) => {
     const date = new Date(item.date)
     const referenceDate = new Date("2024-06-30")
-    let daysToSubtract = 90
-    if (timeRange === "30d") {
-      daysToSubtract = 30
-    } else if (timeRange === "7d") {
-      daysToSubtract = 7
-    }
+    let daysToSubtract = timeRange === "30d" ? 30 : timeRange === "7d" ? 7 : 90
     const startDate = new Date(referenceDate)
     startDate.setDate(startDate.getDate() - daysToSubtract)
     return date >= startDate
@@ -179,10 +159,8 @@ export function ChartAreaInteractive() {
       <CardHeader>
         <CardTitle>Total atenciones nexopus</CardTitle>
         <CardDescription>
-          <span className="hidden @[540px]/card:block">
-            Cantidad
-          </span>
-          <span className="@[540px]/card:hidden">3d meses</span>
+          <span className="hidden @[540px]/card:block">Cantidad</span>
+          <span className="@[540px]/card:hidden">3 meses</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -192,13 +170,13 @@ export function ChartAreaInteractive() {
             variant="outline"
             className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
           >
-            <ToggleGroupItem value="90d">Ultimos 3 meses</ToggleGroupItem>
-            <ToggleGroupItem value="30d">Ultimos 30 dias</ToggleGroupItem>
-            <ToggleGroupItem value="7d">Ultimos 7 dias</ToggleGroupItem>
+            <ToggleGroupItem value="90d">Últimos 3 meses</ToggleGroupItem>
+            <ToggleGroupItem value="30d">Últimos 30 días</ToggleGroupItem>
+            <ToggleGroupItem value="7d">Últimos 7 días</ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger
-              className="flex w-40 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate @[767px]/card:hidden"
+              className="flex w-40 @[767px]/card:hidden"
               size="sm"
               aria-label="Select a value"
             >
@@ -218,33 +196,13 @@ export function ChartAreaInteractive() {
           </Select>
         </CardAction>
       </CardHeader>
+
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
         <ChartContainer
           config={chartConfig}
           className="aspect-auto h-[250px] w-full"
         >
-          <AreaChart data={filteredData}>
-            <defs>
-              <linearGradient id="fillIncidentes" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--color-incidentes)"   stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-incidentes)"   stopOpacity={0.1} />
-              </linearGradient>
-
-              <linearGradient id="fillRequerimiento" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--color-requerimiento)" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-requerimiento)" stopOpacity={0.1} />
-              </linearGradient>
-
-              <linearGradient id="fillFpqrs" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--color-fpqrs)"         stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-fpqrs)"         stopOpacity={0.1} />
-              </linearGradient>
-
-              <linearGradient id="fillConsultaCaso" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--color-consulta_caso)" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-consulta_caso)" stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
+          <BarChart data={filteredData}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
@@ -261,44 +219,23 @@ export function ChartAreaInteractive() {
               }}
             />
             <ChartTooltip
-              cursor={false}
+              cursor={{ fill: "rgba(0,0,0,0.05)" }}
               content={
                 <ChartTooltipContent
-                  labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("en-US", {
+                  labelFormatter={(value) =>
+                    new Date(value).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                     })
-                  }}
-                  indicator="dot"
+                  }
                 />
               }
             />
-            <Area
-              dataKey="incidentes"
-              type="natural"
-              fill="url(#fillIncidentes)"
-              stroke="var(--color-incidentes)"
-            />
-            <Area
-              dataKey="requerimiento"   // ojo: singular, coincide con los datos
-              type="natural"
-              fill="url(#fillRequerimiento)"
-              stroke="var(--color-requerimiento)"
-            />
-            <Area
-              dataKey="fpqrs"
-              type="natural"
-              fill="url(#fillFpqrs)"
-              stroke="var(--color-fpqrs)"
-            />
-            <Area
-              dataKey="consulta_caso"
-              type="natural"
-              fill="url(#fillConsultaCaso)"
-              stroke="var(--color-consulta_caso)"
-            />
-          </AreaChart>
+            <Bar dataKey="incidentes" fill="var(--color-incidentes)" stackId="a" />
+            <Bar dataKey="requerimiento" fill="var(--color-requerimiento)" stackId="a" />
+            <Bar dataKey="fpqrs" fill="var(--color-fpqrs)" stackId="a" />
+            <Bar dataKey="consulta_caso" fill="var(--color-consulta_caso)" stackId="a" />
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>
