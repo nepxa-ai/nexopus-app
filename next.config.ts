@@ -1,16 +1,21 @@
 // next.config.ts
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const isDev = process.env.NODE_ENV !== "production";
 
-  // (opcional si usarás rewrites más abajo)
+const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",                              // lo que tu front consumirá
-        destination: `${process.env.API_BASE_URL}/:path*`, // tu backend real
-      },
-    ];
+    // En desarrollo, proxyear a tu backend local
+    if (isDev) {
+      return [
+        {
+          source: "/api/:path*",
+          destination: "http://localhost:8000/api/:path*",
+        },
+      ];
+    }
+    // En producción NO reescribimos nada: /api la maneja Nginx
+    return [];
   },
 };
 
