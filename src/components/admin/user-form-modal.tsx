@@ -11,7 +11,8 @@ type FormUser = {
   nombres: string;
   apellidos: string;
   password?: string; // requerido solo en creación
-  rol: "admin" | "user" | "viewer";
+  rol: "admin" | "user";
+  extension?: number; // -1 por defecto si no se envía
 };
 
 export function UserFormModal({
@@ -35,6 +36,7 @@ export function UserFormModal({
     apellidos: "",
     password: "",
     rol: "user",
+    extension: -1,
   } as FormUser);
 
   React.useEffect(() => {
@@ -45,6 +47,7 @@ export function UserFormModal({
         apellidos: initial?.apellidos || "",
         password: "", // nunca precargar
         rol: (initial?.rol as FormUser["rol"]) || "user",
+        extension: typeof initial?.extension === "number" ? initial.extension : -1,
       });
     }
   }, [open, initial]);
@@ -55,6 +58,10 @@ export function UserFormModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // normaliza extension
+    if (typeof form.extension !== "number" || Number.isNaN(form.extension)) {
+      form.extension = -1;
+    }
     await onSubmit(form);
   }
 
@@ -92,9 +99,20 @@ export function UserFormModal({
               <SelectContent>
                 <SelectItem value="admin">admin</SelectItem>
                 <SelectItem value="user">user</SelectItem>
-                <SelectItem value="viewer">viewer</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Extensión (−1 = sin extensión)</Label>
+            <Input
+              type="number"
+              min={-1}
+              max={9999}
+              step={1}
+              value={typeof form.extension === "number" ? form.extension : -1}
+              onChange={(e) => set("extension", e.target.value === "" ? -1 : Number(e.target.value))}
+            />
           </div>
 
           <DialogFooter className="gap-2">

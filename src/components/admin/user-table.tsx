@@ -38,6 +38,7 @@ export function UsersTable() {
       const p = await fetchUsers(token, page, 20);
       setData(p.items);
       setTotal(p.total);
+      setError(null);
     } catch (e: any) {
       setError(e.message || "Error");
     } finally {
@@ -49,11 +50,11 @@ export function UsersTable() {
 
   async function onToggleActive(u: User, v: boolean) {
     if (!token) return;
-    await toggleActive(token, u.id, v);
-    setData(prev => prev.map(x => x.id === u.id ? { ...x, is_active: v } : x));
+    const updated = await toggleActive(token, u.id, v);
+    setData(prev => prev.map(x => x.id === u.id ? updated : x));
   }
 
-  async function onInlineEdit(u: User, partial: Partial<Pick<User,"nombres"|"apellidos"|"email"|"rol">>) {
+  async function onInlineEdit(u: User, partial: Partial<Pick<User,"nombres"|"apellidos"|"email"|"rol"|"extension">>) {
     if (!token) return;
     const updated = await updateUser(token, u.id, partial);
     setData(prev => prev.map(x => x.id === u.id ? updated : x));
@@ -81,6 +82,7 @@ export function UsersTable() {
           nombres: payload.nombres,
           apellidos: payload.apellidos,
           rol: payload.rol,
+          extension: typeof payload.extension === "number" ? payload.extension : -1,
         });
       }
       setOpenForm(false);
@@ -129,6 +131,7 @@ export function UsersTable() {
               <th className="p-3 text-left">Apellido</th>
               <th className="p-3 text-left">Email</th>
               <th className="p-3 text-left">Rol</th>
+              <th className="p-3 text-left">Extensión</th>
               <th className="p-3">Activo</th>
               <th className="p-3 text-right">Creado</th>
               <th className="p-3 text-right">Acciones</th>
@@ -141,8 +144,9 @@ export function UsersTable() {
                 <td className="p-3">{u.apellidos}</td>
                 <td className="p-3">{u.email}</td>
                 <td className="p-3">{u.rol}</td>
+                <td className="p-3">{u.extension === -1 ? "—" : u.extension}</td>
                 <td className="p-3 text-center">
-                  <Switch checked={u.is_active} onCheckedChange={(v)=>onToggleActive(u, v)} />
+                  <Switch checked={u.activo} onCheckedChange={(v)=>onToggleActive(u, v)} />
                 </td>
                 <td className="p-3 text-right">
                   <Badge variant="secondary">{new Date(u.fecha_creado).toLocaleDateString()}</Badge>
@@ -166,7 +170,7 @@ export function UsersTable() {
         <Button variant="outline" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Siguiente</Button>
       </div>
 
-      {/* modal form (crear/editar) */}
+      {/* modal form */}
       <UserFormModal
         open={openForm}
         onClose={()=>setOpenForm(false)}

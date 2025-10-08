@@ -1,12 +1,13 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type User = {
+export type User = {
   id: number;
   email: string;
   nombres: string;
   apellidos: string;
   rol: "admin" | "user" | "viewer";
-  is_active: boolean;
+  activo: boolean;
+  extension: number; // -1 = sin extensión
   fecha_creado: string;
   fecha_ultimo_acceso?: string | null;
   fecha_actualizacion?: string | null;
@@ -23,33 +24,43 @@ function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
-export async function fetchUsers(token: string, page = 1, pageSize = 20): Promise<Paginated<User>> {
-  const res = await fetch(`${API_URL}/users/?page=${page}&page_size=${pageSize}`, {
+export async function fetchUsers(
+  token: string,
+  page = 1,
+  pageSize = 20
+): Promise<Paginated<User>> {
+  const res = await fetch(`${API_URL}/users?page=${page}&page_size=${pageSize}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error("No se pudo cargar usuarios");
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const j = await res.json(); if (j?.detail) msg += ` - ${j.detail}`; } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 
 export async function updateUser(
   token: string,
   id: number,
-  data: Partial<Pick<User, "nombres"|"apellidos"|"email"|"rol"|"is_active">>
+  data: Partial<Pick<User, "nombres"|"apellidos"|"email"|"rol"|"activo"|"extension">>
 ): Promise<User> {
   const res = await fetch(`${API_URL}/users/${id}`, {
-    method: "PUT",
+    method: "PATCH",
     headers: authHeaders(token),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("No se pudo actualizar el usuario");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
   return res.json();
 }
 
-export async function toggleActive(token: string, id: number, is_active: boolean): Promise<User> {
-  return updateUser(token, id, { is_active });
+export async function toggleActive(token: string, id: number, activo: boolean): Promise<User> {
+  return updateUser(token, id, { activo });
 }
-
 
 export async function createUser(
   token: string,
@@ -59,16 +70,17 @@ export async function createUser(
     nombres: string;
     apellidos: string;
     rol?: "admin" | "user" | "viewer";
+    extension?: number;
   }
-) {
-  const res = await fetch(`${API_URL}/users/`, {
+): Promise<User> {
+  const res = await fetch(`${API_URL}/users`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, rol: data.rol || "user" }),
+    headers: authHeaders(token),
+    body: JSON.stringify({ ...data, rol: data.rol || "user", extension: data.extension ?? -1 }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "No se pudo crear el usuario");
+    throw new Error(err.detail || `HTTP ${res.status}`);
   }
   return res.json();
 }
@@ -80,8 +92,7 @@ export async function deleteUser(token: string, id: number) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "No se pudo eliminar el usuario");
+    throw new Error(err.detail || `HTTP ${res.status}`);
   }
-  // muchos backends devuelven 204; dejamos vacío
   return true;
 }

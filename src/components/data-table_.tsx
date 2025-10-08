@@ -4,7 +4,27 @@ import * as React from "react"
 import { z } from "zod"
 import { toast } from "sonner"
 
-import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
+import { fetchWebhookEvents, type PaginatedWebhooks, type WebhookEvent } from "@/lib/api-webhooks"
+
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type UniqueIdentifier,
+} from "@dnd-kit/core"
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 import {
   ColumnDef,
@@ -28,9 +48,8 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
+  IconGripVertical,
   IconLayoutColumns,
-  IconRobot,
-  IconUser,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -71,22 +90,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-
-
-import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
-import type { CaseItem } from "@/components/ui/forms-proceso/types"
-
-
 
 // ============================
-// Utils
+// Utils: formato fechas y duración
 // ============================
 const TZ = "America/Bogota"
 const dtf = new Intl.DateTimeFormat("es-CO", {
@@ -111,81 +117,10 @@ function secondsToHMS(total?: number | null) {
   return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`
 }
 
-// mm:ss.d (relativo)
-function fmtTimecode(msFromStart: number) {
-  const totalSeconds = msFromStart / 1000
-  const m = Math.floor(totalSeconds / 60)
-  const s = Math.floor(totalSeconds % 60)
-  const d = Math.floor((totalSeconds - Math.floor(totalSeconds)) * 10)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${pad(m)}:${pad(s)}.${d}`
-}
-
-function toMs(ts: number | string | undefined) {
-  const n = Number(ts ?? NaN)
-  if (!Number.isFinite(n)) return NaN
-  return n > 1e12 ? n : n * 1000
-}
-
-
-type CaseType = CaseItem["type"]
-
-function normalizeTipoSolicitudRaw(t?: string | null): CaseType | "none" {
-  const s = (t ?? "").toLowerCase().trim()
-  if (s === "-" || s === "" || s === "na" || s === "n/a") return "none"
-  if (s.includes("inc")) return "Incidente"
-  if (s.includes("req")) return "Requerimiento"
-  if (s.includes("consult")) return "Consulta de caso"
-  return "none"
-}
-
-function rowToCaseItem(row: RowType): CaseItem {
-  return {
-    id: row.id,
-    header: row.id_dialvox_ != null ? String(row.id_dialvox_) : (row.id_llamada ?? "—"),
-    type: normalizeTipoSolicitudRaw(row.tipo_solicitud) as CaseType,
-    status: row.estado_caso ?? "Not Started",
-    target: row.phone ?? "",
-    limit: row.numero_caso ?? "",
-    reviewer: row.empresa_cliente ?? "Assign reviewer",
-  }
-}
-
-// Modal fallback para tipo "-"
-function TipoSolicitudModalFallback({ item }: { item: RowType }) {
-  return (
-    <div className="space-y-3 text-sm">
-      <p className="text-muted-foreground">
-        Este registro no tiene un tipo de solicitud asignado
-        {" "}
-        (<span className="font-mono">{item.tipo_solicitud ?? "-"}</span>).
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <div className="text-xs text-muted-foreground">Id atención</div>
-          <div className="font-medium">{item.id_dialvox_ ?? item.id_llamada ?? "—"}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Cliente</div>
-          <div className="font-medium">{item.nombre_cliente ?? "—"}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Teléfono</div>
-          <div className="font-medium">{item.phone ?? "—"}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Empresa</div>
-          <div className="font-medium">{item.empresa_cliente ?? "—"}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
 // ============================
-// Schema
+//
+// Schema alineado con tu API
+//
 // ============================
 const schema = z.object({
   id: z.number(),
@@ -193,7 +128,6 @@ const schema = z.object({
   id_llamada: z.string().nullable(),
   phone: z.string().nullable(),
   duration_sec: z.number().nullable(),
-  extension: z.number().nullable(),
   nombre_cliente: z.string().nullable(),
   numero_caso: z.string().nullable(),
   estado_caso: z.string().nullable(),
@@ -207,25 +141,13 @@ const schema = z.object({
   en_horario: z.boolean().nullable(),
   extracted_variables: z.any().nullable(),
   contratos_empresa: z.any().nullable(),
-  transcript_text: z.string().nullable(), // podría venir aquí ese string plano
-  transcript_url: z.string().nullable(),
+  transcript_text: z.string().nullable(),
   recording_url: z.string().nullable(),
+  transcript_url: z.string().nullable(),
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-  // opcional: si ya viene como arreglo
-  transcript: z.any().nullable(),
-  // opcional: si lo traes anidado en body.transcript.transcript
-  body: z
-    .object({
-      transcript: z
-        .object({
-          transcript: z.any().optional(),
-        })
-        .optional(),
-    })
-    .optional(),
 })
 type RowType = z.infer<typeof schema>
 
@@ -256,7 +178,27 @@ const booleanTriStateFilter = (
 }
 
 // ============================
-// Drawer de detalle (Id atención)
+// Drag handle
+// ============================
+function DragHandle({ id }: { id: number }) {
+  const { attributes, listeners } = useSortable({ id })
+  return (
+    <Button
+      {...attributes}
+      {...listeners}
+      variant="ghost"
+      size="icon"
+      className="text-muted-foreground size-7 hover:bg-transparent"
+      title="Arrastrar para reordenar"
+    >
+      <IconGripVertical className="text-muted-foreground size-3" />
+      <span className="sr-only">Drag to reorder</span>
+    </Button>
+  )
+}
+
+// ============================
+// Drawer simple de detalle
 // ============================
 function IdAtencionCell({ item }: { item: RowType }) {
   const headerText =
@@ -319,7 +261,7 @@ function IdAtencionCell({ item }: { item: RowType }) {
 
           <Separator />
           <div className="grid gap-2">
-            <div className="text-xs text-muted-foreground">Transcript (texto plano)</div>
+            <div className="text-xs text-muted-foreground">Transcript</div>
             <div className="text-muted-foreground">{item.transcript_text ?? "—"}</div>
           </div>
         </div>
@@ -335,188 +277,19 @@ function IdAtencionCell({ item }: { item: RowType }) {
 }
 
 // ============================
-// Chat: parsing & UI (ya tenías)
-// ============================
-type TranscriptMsg = { text: string; sender?: string; timestamp?: number | string; type?: string }
-
-/** Convierte un string "bot: ... human: ... bot: ..." a arreglo de mensajes */
-function parseFlatTranscript(s: string): TranscriptMsg[] {
-  if (!s) return []
-  const re = /(bot|human)\s*:\s*([^]*?)(?=(?:\s*(?:bot|human)\s*:)|$)/gi
-  const out: TranscriptMsg[] = []
-  let m: RegExpExecArray | null
-  while ((m = re.exec(s)) !== null) {
-    const role = (m[1] || "").toLowerCase().trim()
-    const text = (m[2] || "").trim()
-    if (text) out.push({ sender: role, text })
-  }
-  if (!out.length) return [{ sender: "human", text: s }]
-  return out
-}
-
-function normalizeTranscript(value: any, fallbackText?: string): TranscriptMsg[] {
-  if (Array.isArray(value?.transcript)) return value.transcript as TranscriptMsg[]
-  if (Array.isArray(value)) return value as TranscriptMsg[]
-  if (typeof value === "string") return parseFlatTranscript(value)
-  if (typeof fallbackText === "string") return parseFlatTranscript(fallbackText)
-  return []
-}
-
-function TranscriptChat({ item }: { item: RowType }) {
-  const raw =
-    item.transcript ??
-    item.body?.transcript?.transcript ??
-    item.transcript_text
-
-  const msgs = normalizeTranscript(raw, item.transcript_text || undefined)
-  if (!msgs.length) return <span className="text-muted-foreground">—</span>
-
-  const numbers = msgs.map(m => toMs(m.timestamp)).filter(Number.isFinite) as number[]
-  const hasTimes = numbers.length > 0
-  const firstMs = hasTimes ? Math.min(...numbers) : 0
-
-  return (
-    <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto pr-1">
-      {msgs.map((m, i) => {
-        const isBot = (m.sender ?? "").toLowerCase() === "bot" || (m.sender ?? "").toLowerCase() === "assistant"
-        const ms = toMs(m.timestamp)
-        const showTime = hasTimes && Number.isFinite(ms)
-        const rel = showTime ? Math.max(0, (ms as number) - firstMs) : 0
-
-        return (
-          <div key={i} className={`flex ${isBot ? "justify-end" : "justify-start"}`}>
-            <div className="flex items-start gap-2 max-w-[88%]">
-              {!isBot && (
-                <div className="mt-1 shrink-0">
-                  <IconUser className="size-5" />
-                </div>
-              )}
-              <div className="rounded-xl px-3 py-2 border">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                  <span className="font-medium">{isBot ? "Asistente" : "Cliente"}</span>
-                  {showTime && <span>{fmtTimecode(rel)}</span>}
-                </div>
-                <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</div>
-              </div>
-              {isBot && (
-                <div className="mt-1 shrink-0">
-                  <IconRobot className="size-5" />
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function TranscriptCell({ item }: { item: RowType }) {
-  const hasTranscript =
-    !!item.transcript ||
-    !!item.body?.transcript?.transcript ||
-    !!item.transcript_text
-
-  if (!hasTranscript) return <span className="text-muted-foreground">—</span>
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="link" className="px-0">Transcripción</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Transcripción</DialogTitle>
-        </DialogHeader>
-        <TranscriptChat item={item} />
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ============================
-// Variables extraídas: helpers + UI
-// ============================
-type Json = unknown
-
-function toObjectOrNull(v: unknown): Record<string, Json> | null {
-  if (!v) return null
-  if (typeof v === "string") {
-    try {
-      const parsed = JSON.parse(v)
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Record<string, Json>)
-        : null
-    } catch {
-      return null
-    }
-  }
-  if (typeof v === "object" && !Array.isArray(v)) return v as Record<string, Json>
-  return null
-}
-const isEmpty = (o: Record<string, Json> | null) => !o || Object.keys(o).length === 0
-
-function PrettyValue({ value }: { value: Json }) {
-  if (value === null || typeof value === "undefined" || value === "") {
-    return <span className="text-muted-foreground">—</span>
-  }
-  if (typeof value === "boolean") {
-    return value ? <span>Sí</span> : <span>No</span>
-  }
-  if (typeof value === "number") return <span>{value}</span>
-  if (typeof value === "string") return <span className="whitespace-pre-wrap">{value}</span>
-  if (Array.isArray(value)) return <span className="whitespace-pre-wrap text-sm">{value.map(String).join(", ")}</span>
-  try {
-    return <span className="whitespace-pre-wrap text-xs">{JSON.stringify(value, null, 2)}</span>
-  } catch {
-    return <span className="text-muted-foreground">[obj]</span>
-  }
-}
-
-function ExtractedVarsDialog({ vars }: { vars: Record<string, Json> }) {
-  const entries = Object.entries(vars)
-  return (
-    <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto pr-1">
-      {entries.map(([k, v]) => (
-        <div key={k} className="rounded-lg border p-4 grid gap-2 sm:grid-cols-2">
-          <div>
-            <div className="text-xs text-muted-foreground">Variable name</div>
-            <div className="font-mono text-sm break-all">{k}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Value</div>
-            <div className="mt-1"><PrettyValue value={v} /></div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ExtractedVarsCell({ item }: { item: RowType }) {
-  const vars = toObjectOrNull(item.extracted_variables)
-  if (isEmpty(vars)) return <span className="text-muted-foreground">—</span>
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="link" className="px-0">Ver detalles</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Variables extraídas</DialogTitle>
-        </DialogHeader>
-        <ExtractedVarsDialog vars={vars as Record<string, Json>} />
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ============================
-// Columnas
+// Columnas (orden solicitado)
 // ============================
 const columns: ColumnDef<RowType>[] = [
-  // Checkbox
+  // Drag
+  {
+    id: "drag",
+    header: () => null,
+    cell: ({ row }) => <DragHandle id={row.original.id} />,
+    enableHiding: false,
+    enableSorting: false,
+  },
+
+  // Checkbox selección
   {
     id: "select",
     header: ({ table }) => (
@@ -544,7 +317,7 @@ const columns: ColumnDef<RowType>[] = [
     enableHiding: false,
   },
 
-  // 1) Id atención
+  // 1) Id atención (id_dialvox_)
   {
     id: "id_atencion",
     header: "Id atención",
@@ -553,136 +326,129 @@ const columns: ColumnDef<RowType>[] = [
     enableHiding: false,
   },
 
-  // 2) Tipo de solicitud
+  // 2) Tipo de solictud
   {
     accessorKey: "tipo_solicitud",
-    header: "Tipo de solicitud",
+    header: "Tipo de solictud",
     cell: ({ row }) => {
-      const raw = row.original.tipo_solicitud ?? "—"
-      const norm = normalizeTipoSolicitudRaw(raw) // Incidente | Requerimiento | Consulta de caso | "none"
-      const label = raw === "-" || !raw ? "—" : raw
-
-      const isLargeForm = norm === "Requerimiento" || norm === "Incidente"
-
+      const t = row.original.tipo_solicitud ?? "—"
       return (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
-              <Badge variant="outline" className="px-1.5 text-muted-foreground">
-                {label}
-              </Badge>
-            </Button>
-          </DialogTrigger>
-
-          {norm === "none" ? (
-            // Fallback cuando no hay tipo (o "-"): modal simple
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Tipo de solicitud</DialogTitle>
-              </DialogHeader>
-              <TipoSolicitudModalFallback item={row.original} />
-            </DialogContent>
-          ) : isLargeForm ? (
-            // 🔹 SOLO para Requerimiento e Incidente: header sticky + cuerpo scrollable
-            <DialogContent className="sm:max-w-3xl p-0">
-              <DialogHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
-                <DialogTitle>{norm}</DialogTitle>
-              </DialogHeader>
-              <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
-                <CaseFormRouter
-                  item={rowToCaseItem(row.original)}
-                  onSubmit={(payload) => {
-                    console.log("payload form:", payload)
-                    toast.success("Formulario capturado")
-                  }}
-                />
-              </div>
-            </DialogContent>
-          ) : (
-            // Consulta de caso (u otros que ya se ven bien): sin cambios
-            <DialogContent className="sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>{norm}</DialogTitle>
-              </DialogHeader>
-              <CaseFormRouter
-                item={rowToCaseItem(row.original)}
-                onSubmit={(payload) => {
-                  console.log("payload form:", payload)
-                  toast.success("Formulario capturado")
-                }}
-              />
-            </DialogContent>
-          )}
-        </Dialog>
+        <Badge variant="outline" className="text-muted-foreground px-1.5">
+          {t}
+        </Badge>
       )
     },
   },
 
-  // 3) Estado (placeholder)
-  { id: "estado", header: "Estado", cell: () => <span className="text-muted-foreground">—</span> },
-
-  // 4) Gestor Asignado (placeholder)
+  // 3) Estado (en blanco)
   {
-  id: "gestor_asignado",
-  header: "Extensión Asignada",
-  accessorKey: "extension",
-  cell: ({ row }) => {
-    const ext = row.original.extension
-    return (
-      <span className={ext && ext > 0 ? "font-semibold" : "text-muted-foreground"}>
-        {ext && ext > 0 ? ext : "—"}
-      </span>
-    )
+    id: "estado",
+    header: "Estado",
+    cell: () => <span className="text-muted-foreground">—</span>,
   },
-},
+
+  // 4) Gestor Asignado (en blanco)
+  {
+    id: "gestor_asignado",
+    header: "Gestor Asignado",
+    cell: () => <span className="text-muted-foreground">—</span>,
+  },
+
   // ——— Complementarias ———
   { accessorKey: "id_llamada", header: "id_llamada" },
-  { accessorKey: "phone", header: "Teléfono" },
+  { accessorKey: "phone", header: "phone" },
   {
-    id: "duracion",
-    header: () => <span className="whitespace-pre-line leading-tight">{"Duración\nmm:ss"}</span>,
+    accessorKey: "duration_sec",
+    header: "duration_sec",
     cell: ({ row }) => <span>{secondsToHMS(row.original.duration_sec)}</span>,
   },
-  { accessorKey: "nombre_cliente", header: "Nombre cliente" },
-  { accessorKey: "empresa_cliente", header: "Empresa" },
-
+  { accessorKey: "nombre_cliente", header: "nombre_cliente" },
+  { accessorKey: "empresa_cliente", header: "empresa_cliente" },
   {
     accessorKey: "es_vip",
-    header: "VIP",
+    header: "es_vip",
     filterFn: "booleanTri",
     cell: ({ row }) =>
-      row.original.es_vip ? <Badge variant="secondary">VIP</Badge> : <span className="text-muted-foreground">No</span>,
+      row.original.es_vip ? (
+        <Badge variant="secondary">VIP</Badge>
+      ) : (
+        <span className="text-muted-foreground">No</span>
+      ),
   },
-
   {
     accessorKey: "en_horario",
     header: "en_horario",
     filterFn: "booleanTri",
     cell: ({ row }) =>
-      row.original.en_horario ? <Badge variant="outline">En horario</Badge> : <span className="text-muted-foreground">Fuera de horario</span>,
+      row.original.en_horario ? (
+        <Badge variant="outline">En horario</Badge>
+      ) : (
+        <span className="text-muted-foreground">Fuera de horario</span>
+      ),
   },
-
-  // 🔹 Variables extraídas → “Ver detalles” (modal)
   {
     accessorKey: "extracted_variables",
-    header: "Variables extraídas",
-    cell: ({ row }) => <ExtractedVarsCell item={row.original} />,
+    header: "extracted_variables",
+    cell: ({ row }) => {
+      const v = row.original.extracted_variables
+      const text =
+        v == null
+          ? "—"
+          : typeof v === "string"
+          ? v
+          : (() => {
+              try {
+                return JSON.stringify(v)
+              } catch {
+                return String(v)
+              }
+            })()
+      return <span className="line-clamp-2 break-all text-xs">{text}</span>
+    },
   },
-
-  // 🔹 Transcripción (chat)
-  { id: "transcript_chat", header: "Transcripción", cell: ({ row }) => <TranscriptCell item={row.original} /> },
-
+  {
+    accessorKey: "transcript_text",
+    header: "transcript_text",
+    cell: ({ row }) => (
+      <span className="line-clamp-2 text-xs text-muted-foreground">
+        {row.original.transcript_text ?? "—"}
+      </span>
+    ),
+  },
   {
     accessorKey: "recording_url",
-    header: "Grabación",
+    header: "recording_url",
     cell: ({ row }) =>
       row.original.recording_url ? (
-        <a href={row.original.recording_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">abrir</a>
+        <a
+          href={row.original.recording_url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
+          abrir
+        </a>
       ) : (
         <span className="text-muted-foreground">—</span>
       ),
   },
-
+  {
+    accessorKey: "transcript_url",
+    header: "transcript_url",
+    cell: ({ row }) =>
+      row.original.transcript_url ? (
+        <a
+          href={row.original.transcript_url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
+          abrir
+        </a>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
   {
     accessorKey: "started_at",
     header: "started_at",
@@ -702,7 +468,7 @@ const columns: ColumnDef<RowType>[] = [
   },
   {
     accessorKey: "created_at",
-    header: "Creado",
+    header: "created_at",
     cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.created_at)}</span>,
     sortingFn: (a, b) =>
       (new Date(a.original.created_at || 0).getTime() || 0) -
@@ -722,7 +488,9 @@ const columns: ColumnDef<RowType>[] = [
         row.tipo_solicitud,
         row.empresa_cliente,
         row.transcript_text,
-        typeof row.extracted_variables === "string" ? row.extracted_variables : JSON.stringify(row.extracted_variables ?? ""),
+        typeof row.extracted_variables === "string"
+          ? row.extracted_variables
+          : JSON.stringify(row.extracted_variables ?? ""),
       ]
         .filter(Boolean)
         .join(" ")
@@ -733,7 +501,7 @@ const columns: ColumnDef<RowType>[] = [
 ]
 
 // ============================
-// Toolbar
+// Toolbar (filtros locales + filtros API opcionales)
 // ============================
 function Toolbar({
   table,
@@ -849,15 +617,15 @@ function Toolbar({
           <DropdownMenuContent align="end" className="w-56">
             {table
               .getAllColumns()
-              .filter((c) => c.getCanHide())
-              .map((c) => (
+              .filter((column) => typeof column.accessorFn !== "undefined" && column.getCanHide())
+              .map((column) => (
                 <DropdownMenuCheckboxItem
-                  key={c.id}
+                  key={column.id}
                   className="capitalize"
-                  checked={c.getIsVisible()}
-                  onCheckedChange={(value) => c.toggleVisibility(!!value)}
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
                 >
-                  {c.id}
+                  {column.id}
                 </DropdownMenuCheckboxItem>
               ))}
           </DropdownMenuContent>
@@ -868,11 +636,36 @@ function Toolbar({
 }
 
 // ============================
-// Componente principal
+// Fila draggable
+// ============================
+function DraggableRow({ row }: { row: Row<RowType> }) {
+  const { transform, transition, setNodeRef, isDragging } = useSortable({
+    id: row.original.id as UniqueIdentifier,
+  })
+
+  return (
+    <TableRow
+      data-state={row.getIsSelected() && "selected"}
+      data-dragging={isDragging}
+      ref={setNodeRef}
+      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      {row.getVisibleCells().map((cell) => (
+        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+      ))}
+    </TableRow>
+  )
+}
+
+// ============================
+// Componente principal (default)
 // ============================
 export default function DataTable() {
-  const [pageIndex, setPageIndex] = React.useState(0)
+  const [pageIndex, setPageIndex] = React.useState(0) // 0-based
   const [pageSize, setPageSize] = React.useState(10)
+
+  // filtros que van al backend (opcionales)
   const [serverFilters, setServerFilters] = React.useState<{ phone?: string; id_llamada?: string }>({})
 
   const [loading, setLoading] = React.useState(false)
@@ -886,7 +679,7 @@ export default function DataTable() {
         setLoading(true)
         setError(null)
         const res = await fetchWebhookEvents({
-          page: pageIndex + 1,
+          page: pageIndex + 1, // backend 1-based
           page_size: pageSize,
           phone: serverFilters.phone,
           id_llamada: serverFilters.id_llamada,
@@ -901,7 +694,9 @@ export default function DataTable() {
         if (!abort) setLoading(false)
       }
     })()
-    return () => { abort = true }
+    return () => {
+      abort = true
+    }
   }, [pageIndex, pageSize, serverFilters])
 
   const items: RowType[] = React.useMemo(() => {
@@ -917,6 +712,17 @@ export default function DataTable() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({ search: false })
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {}),
+    useSensor(TouchSensor, {}),
+    useSensor(KeyboardSensor, {})
+  )
+
+  const dataIds = React.useMemo<UniqueIdentifier[]>(
+    () => items?.map(({ id }) => id) || [],
+    [items]
+  )
 
   const table = useReactTable({
     data: items,
@@ -935,12 +741,15 @@ export default function DataTable() {
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: (updater) => {
-      const next = typeof updater === "function" ? updater({ pageIndex, pageSize }) : updater
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex, pageSize })
+          : updater
       setPageIndex(next.pageIndex)
       setPageSize(next.pageSize)
     },
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: getFilteredRowModel(), // locales
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
@@ -954,12 +763,26 @@ export default function DataTable() {
         return v.includes(String(filterValue).toLowerCase())
       },
     },
-    manualPagination: true,
+    manualPagination: true, // usamos paginación del servidor
     pageCount: page ? Math.ceil(page.total / page.page_size) : -1,
   })
 
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (active && over && active.id !== over.id) {
+      const oldIndex = dataIds.indexOf(active.id)
+      const newIndex = dataIds.indexOf(over.id)
+      const newOrder = arrayMove(items, oldIndex, newIndex)
+      toast.success("Reordenado localmente")
+      // refresca la tabla con el nuevo orden local (no persistimos)
+      table.options.data = newOrder as any
+      table.resetRowSelection()
+    }
+  }
+
   return (
     <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
+      {/* Toolbar con filtros locales y filtros API */}
       <Toolbar
         table={table}
         serverFilters={serverFilters}
@@ -967,64 +790,86 @@ export default function DataTable() {
         showServerFilters
       />
 
-      <TabsContent value="outline" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+      <TabsContent
+        value="outline"
+        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
+      >
         <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader className="bg-muted sticky top-0 z-10">
-              <TableRow>
-                {table.getFlatHeaders().map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-
-            <TableBody className="**:data-[slot=table-cell]:first:w-8">
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">Cargando…</TableCell>
-                </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center text-red-600">{error}</TableCell>
-                </TableRow>
-              ) : table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row: Row<RowType>) => (
-                  <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
+          <DndContext
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={handleDragEnd}
+            sensors={sensors}
+          >
+            <Table>
+              <TableHeader className="bg-muted sticky top-0 z-10">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
                     ))}
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">Sin resultados.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableHeader>
+
+              <TableBody className="**:data-[slot=table-cell]:first:w-8">
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      Cargando…
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-600">
+                      {error}
+                    </TableCell>
+                  </TableRow>
+                ) : table.getRowModel().rows?.length ? (
+                  <SortableContext items={dataIds} strategy={verticalListSortingStrategy}>
+                    {table.getRowModel().rows.map((row) => (
+                      <DraggableRow key={row.id} row={row} />
+                    ))}
+                  </SortableContext>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      Sin resultados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </DndContext>
         </div>
 
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            {table.getFilteredSelectedRowModel().rows.length} de {table.getFilteredRowModel().rows.length} filas(s) seleccionadas.
+            {table.getFilteredSelectedRowModel().rows.length} de{" "}
+            {table.getFilteredRowModel().rows.length} filas(s) seleccionadas.
           </div>
 
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">Filas por página</Label>
-              <Select value={`${pageSize}`} onValueChange={(value) => setPageSize(Number(value))}>
+              <Label htmlFor="rows-per-page" className="text-sm font-medium">
+                Filas por página
+              </Label>
+              <Select
+                value={`${pageSize}`}
+                onValueChange={(value) => setPageSize(Number(value))}
+              >
                 <SelectTrigger size="sm" className="w-20" id="rows-per-page">
                   <SelectValue placeholder={pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">
                   {[10, 20, 30, 40, 50].map((ps) => (
-                    <SelectItem key={ps} value={`${ps}`}>{ps}</SelectItem>
+                    <SelectItem key={ps} value={`${ps}`}>
+                      {ps}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1035,15 +880,32 @@ export default function DataTable() {
             </div>
 
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
-              <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => setPageIndex(0)} disabled={pageIndex === 0}>
+              <Button
+                variant="outline"
+                className="hidden h-8 w-8 p-0 lg:flex"
+                onClick={() => setPageIndex(0)}
+                disabled={pageIndex === 0}
+              >
                 <span className="sr-only">Primera página</span>
                 <IconChevronsLeft />
               </Button>
-              <Button variant="outline" className="size-8" size="icon" onClick={() => setPageIndex((p) => Math.max(0, p - 1))} disabled={pageIndex === 0}>
+              <Button
+                variant="outline"
+                className="size-8"
+                size="icon"
+                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                disabled={pageIndex === 0}
+              >
                 <span className="sr-only">Página anterior</span>
                 <IconChevronLeft />
               </Button>
-              <Button variant="outline" className="size-8" size="icon" onClick={() => setPageIndex((p) => p + 1)} disabled={!!page && page.page * page.page_size >= page.total}>
+              <Button
+                variant="outline"
+                className="size-8"
+                size="icon"
+                onClick={() => setPageIndex((p) => p + 1)}
+                disabled={!!page && (page.page * page.page_size >= page.total)}
+              >
                 <span className="sr-only">Página siguiente</span>
                 <IconChevronRight />
               </Button>

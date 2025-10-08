@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
+
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,15 @@ import { Label } from "@/components/ui/label";
 
 import { apiLogin, fetchMe } from "@/lib/api";
 
+import Image from "next/image";
+
+
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const [email, setEmail] = React.useState<string>("");
   const [password, setPass] = React.useState<string>("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  
   const router = useRouter();
 
   async function onSubmit(e: React.FormEvent) {
@@ -24,13 +28,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     setError(null);
     setLoading(true);
     try {
+
       const { access_token } = await apiLogin({ username: email, password });
       localStorage.setItem("access_token", access_token);
       await fetchMe(access_token);
       router.push("/dashboard");
-    } catch (err: any) {
+    } 
+    catch (err: any) {
       setError(err?.message || "Error de autenticación");
-    } finally {
+    } 
+    finally {
       setLoading(false);
     }
   }
