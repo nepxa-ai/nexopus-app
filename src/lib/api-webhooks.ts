@@ -48,7 +48,7 @@ export async function fetchWebhookEvents(params?: { page?: number; page_size?: n
   if (params?.phone) qs.set("phone", params.phone)
   if (params?.id_llamada) qs.set("id_llamada", params.id_llamada)
 
-  const res = await fetch(`${API_URL}/webhooks/events?${qs.toString()}`, {
+  const res = await fetch(`api/webhooks/events?${qs.toString()}`, {
     headers: { Authorization: token ? `Bearer ${token}` : "" },
     cache: "no-store",
   })
