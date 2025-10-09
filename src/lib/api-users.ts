@@ -1,3 +1,4 @@
+// src/lib/api-users.ts
 export type UserLite = {
   id: number
   nombres: string
@@ -5,15 +6,16 @@ export type UserLite = {
   extension: number
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 export async function fetchUserByExtensionLite(ext: number): Promise<UserLite | null> {
-  // Soporta -1 igual que el backend
   if (ext === -1) return { id: 0, nombres: "No asignado", apellidos: "", extension: -1 }
   if (ext == null || ext <= 0) return null
 
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
 
-  // Usa el proxy Next.js como tus otros fetchers: /api/...
-  const res = await fetch(`api/users/by-extension/${ext}/lite`, {
+  // 👇 Llama al backend FastAPI directo
+  const res = await fetch(`${API_URL}/users/by-extension/${ext}/lite`, {
     headers: { Authorization: token ? `Bearer ${token}` : "" },
     cache: "no-store",
   })
