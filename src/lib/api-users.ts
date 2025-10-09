@@ -6,20 +6,20 @@ export type UserLite = {
   extension: number
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
 export async function fetchUserByExtensionLite(ext: number): Promise<UserLite | null> {
+  // Placeholders y validaciones rápidas (evitan llamadas innecesarias)
   if (ext === -1) return { id: 0, nombres: "No asignado", apellidos: "", extension: -1 }
   if (ext == null || ext <= 0) return null
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("access_token") : null
 
-  // 👇 Llama al backend FastAPI directo
-  const res = await fetch(`${API_URL}/users/by-extension/${ext}/lite`, {
-    headers: { Authorization: token ? `Bearer ${token}` : "" },
+  // 🔧 Ruta relativa -> Nginx la reescribe a tu FastAPI (/api/users/...)
+  const res = await fetch(`api/users/by-extension/${ext}/lite`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: "no-store",
-  })
+  }).catch(() => null)
 
-  if (!res.ok) return null
+  if (!res || !res.ok) return null
   return res.json() as Promise<UserLite>
 }
