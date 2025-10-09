@@ -5,6 +5,7 @@ import { z } from "zod"
 import { toast } from "sonner"
 
 import { fetchWebhookEvents, type PaginatedWebhooks, type WebhookEvent } from "@/lib/api-webhooks"
+import { fetchUserByExtensionLite } from "@/lib/api-users"
 
 import {
   closestCenter,
@@ -128,6 +129,7 @@ const schema = z.object({
   id_llamada: z.string().nullable(),
   phone: z.string().nullable(),
   duration_sec: z.number().nullable(),
+  extension: z.coerce.number().nullable(),
   nombre_cliente: z.string().nullable(),
   numero_caso: z.string().nullable(),
   estado_caso: z.string().nullable(),
@@ -276,6 +278,59 @@ function IdAtencionCell({ item }: { item: RowType }) {
   )
 }
 
+const gestorCache = new Map<number, string>() // ext -> "Nombre Apellido"
+
+function GestorCell({ ext }: { ext: number | null }) {
+  const [name, setName] = React.useState<string | null>(null)
+  const [loading, setLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    let abort = false
+    async function run() {
+      if (ext == null) return
+      const cached = gestorCache.get(ext)
+      if (cached) { setName(cached); return }
+      setLoading(true)
+      try {
+        const u = await fetchUserByExtensionLite(ext)
+        if (!abort) {
+          const full = u ? `${u.nombres} ${u.apellidos}`.trim() : ""
+          if (full) {
+            gestorCache.set(ext, full)
+            setName(full)
+          } else {
+            setName(null)
+          }
+        }
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    run()
+    return () => { abort = true }
+  }, [ext])
+
+  // Sin dato
+  if (ext == null) return <span className="text-muted-foreground">—</span>
+  // Loading inicial
+  if (loading && !name) return <span className="text-muted-foreground">cargando…</span>
+  // Placeholder -1
+  if (ext === -1) return <span className="text-muted-foreground">No asignado</span>
+
+  // Con nombre resuelto
+  return name ? (
+    <span className="whitespace-nowrap">
+      {name} <span className="text-muted-foreground">(ext. {ext})</span>
+    </span>
+  ) : (
+    // Sin match en backend: muestra solo la extensión
+    <span className="whitespace-nowrap">
+      <span className="text-muted-foreground">Ext.</span> {ext}
+    </span>
+  )
+}
+
+
 // ============================
 // Columnas (orden solicitado)
 // ============================
@@ -348,11 +403,26 @@ const columns: ColumnDef<RowType>[] = [
   },
 
   // 4) Gestor Asignado (en blanco)
-  {
-    id: "gestor_asignado",
-    header: "Gestor Asignado",
-    cell: () => <span className="text-muted-foreground">—</span>,
+{
+  id: "gestor_asignado",
+  header: "Gestor asignado",
+  accessorKey: "extension",
+  cell: ({ row }) => {
+    const v = row.getValue("extension") as unknown
+    // normalización segura a number | null
+    const ext =
+      v == null
+        ? null
+        : typeof v === "number"
+        ? v
+        : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
+        ? Number(v)
+        : null
+
+    return <GestorCell ext={ext} />
   },
+},
+
 
   // ——— Complementarias ———
   { accessorKey: "id_llamada", header: "id_llamada" },
