@@ -147,6 +147,41 @@ function rowToCaseItem(row: RowType): CaseItem {
   }
 }
 
+function TipoSolicitudModalFallback({ item }: { item: RowType }) {
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-muted-foreground">
+        Este registro no tiene un tipo de solicitud asignado{" "}
+        (<span className="font-mono">{item.tipo_solicitud ?? "-"}</span>).
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <div className="text-xs text-muted-foreground">Id atención</div>
+          <div className="font-medium">
+            {item.id_dialvox_ ?? item.id_llamada ?? "—"}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-xs text-muted-foreground">Cliente</div>
+          <div className="font-medium">{item.nombre_cliente ?? "—"}</div>
+        </div>
+
+        <div>
+          <div className="text-xs text-muted-foreground">Teléfono</div>
+          <div className="font-medium">{item.phone ?? "—"}</div>
+        </div>
+
+        <div>
+          <div className="text-xs text-muted-foreground">Empresa</div>
+          <div className="font-medium">{item.empresa_cliente ?? "—"}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ============================
 // Schema (nota: extension -> coerce.number)
 // ============================
