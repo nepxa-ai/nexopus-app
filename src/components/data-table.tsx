@@ -5,6 +5,7 @@ import { z } from "zod"
 import { toast } from "sonner"
 
 import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
+import { fetchUserByExtensionLite } from "@/lib/api-users"
 
 import {
   ColumnDef,
@@ -79,11 +80,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-
 import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
 import type { CaseItem } from "@/components/ui/forms-proceso/types"
-
-
 
 // ============================
 // Utils
@@ -111,7 +109,6 @@ function secondsToHMS(total?: number | null) {
   return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`
 }
 
-// mm:ss.d (relativo)
 function fmtTimecode(msFromStart: number) {
   const totalSeconds = msFromStart / 1000
   const m = Math.floor(totalSeconds / 60)
@@ -126,7 +123,6 @@ function toMs(ts: number | string | undefined) {
   if (!Number.isFinite(n)) return NaN
   return n > 1e12 ? n : n * 1000
 }
-
 
 type CaseType = CaseItem["type"]
 
@@ -151,41 +147,8 @@ function rowToCaseItem(row: RowType): CaseItem {
   }
 }
 
-// Modal fallback para tipo "-"
-function TipoSolicitudModalFallback({ item }: { item: RowType }) {
-  return (
-    <div className="space-y-3 text-sm">
-      <p className="text-muted-foreground">
-        Este registro no tiene un tipo de solicitud asignado
-        {" "}
-        (<span className="font-mono">{item.tipo_solicitud ?? "-"}</span>).
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <div className="text-xs text-muted-foreground">Id atención</div>
-          <div className="font-medium">{item.id_dialvox_ ?? item.id_llamada ?? "—"}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Cliente</div>
-          <div className="font-medium">{item.nombre_cliente ?? "—"}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Teléfono</div>
-          <div className="font-medium">{item.phone ?? "—"}</div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Empresa</div>
-          <div className="font-medium">{item.empresa_cliente ?? "—"}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
 // ============================
-// Schema
+// Schema (nota: extension -> coerce.number)
 // ============================
 const schema = z.object({
   id: z.number(),
@@ -193,7 +156,7 @@ const schema = z.object({
   id_llamada: z.string().nullable(),
   phone: z.string().nullable(),
   duration_sec: z.number().nullable(),
-  extension: z.number().nullable(),
+  extension: z.coerce.number().nullable(), // 👈 importante si llega "1234" como string
   nombre_cliente: z.string().nullable(),
   numero_caso: z.string().nullable(),
   estado_caso: z.string().nullable(),
@@ -207,16 +170,14 @@ const schema = z.object({
   en_horario: z.boolean().nullable(),
   extracted_variables: z.any().nullable(),
   contratos_empresa: z.any().nullable(),
-  transcript_text: z.string().nullable(), // podría venir aquí ese string plano
+  transcript_text: z.string().nullable(),
   transcript_url: z.string().nullable(),
   recording_url: z.string().nullable(),
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-  // opcional: si ya viene como arreglo
   transcript: z.any().nullable(),
-  // opcional: si lo traes anidado en body.transcript.transcript
   body: z
     .object({
       transcript: z
@@ -335,11 +296,10 @@ function IdAtencionCell({ item }: { item: RowType }) {
 }
 
 // ============================
-// Chat: parsing & UI (ya tenías)
+// Chat parsing & UI
 // ============================
 type TranscriptMsg = { text: string; sender?: string; timestamp?: number | string; type?: string }
 
-/** Convierte un string "bot: ... human: ... bot: ..." a arreglo de mensajes */
 function parseFlatTranscript(s: string): TranscriptMsg[] {
   if (!s) return []
   const re = /(bot|human)\s*:\s*([^]*?)(?=(?:\s*(?:bot|human)\s*:)|$)/gi
@@ -435,7 +395,7 @@ function TranscriptCell({ item }: { item: RowType }) {
 }
 
 // ============================
-// Variables extraídas: helpers + UI
+// Variables extraídas UI
 // ============================
 type Json = unknown
 
@@ -460,9 +420,7 @@ function PrettyValue({ value }: { value: Json }) {
   if (value === null || typeof value === "undefined" || value === "") {
     return <span className="text-muted-foreground">—</span>
   }
-  if (typeof value === "boolean") {
-    return value ? <span>Sí</span> : <span>No</span>
-  }
+  if (typeof value === "boolean") return value ? <span>Sí</span> : <span>No</span>
   if (typeof value === "number") return <span>{value}</span>
   if (typeof value === "string") return <span className="whitespace-pre-wrap">{value}</span>
   if (Array.isArray(value)) return <span className="whitespace-pre-wrap text-sm">{value.map(String).join(", ")}</span>
@@ -513,10 +471,60 @@ function ExtractedVarsCell({ item }: { item: RowType }) {
 }
 
 // ============================
+// Gestor por extensión (llama al backend)
+// ============================
+const gestorCache = new Map<number, string>() // ext -> "Nombre Apellido"
+
+function GestorCell({ ext }: { ext: number | null }) {
+  const [name, setName] = React.useState<string | null>(null)
+  const [loading, setLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    let abort = false
+    async function run() {
+      if (ext == null) return
+      console.log("[DEBUG] GestorCell effect ext:", ext)
+      const cached = gestorCache.get(ext)
+      if (cached) { setName(cached); return }
+      setLoading(true)
+      try {
+        const u = await fetchUserByExtensionLite(ext) // ← /api/users/by-extension/:ext/lite
+        if (!abort) {
+          const full = u ? `${u.nombres} ${u.apellidos}`.trim() : ""
+          if (full) {
+            gestorCache.set(ext, full)
+            setName(full)
+          } else {
+            setName(null)
+          }
+        }
+      } finally {
+        if (!abort) setLoading(false)
+      }
+    }
+    run()
+    return () => { abort = true }
+  }, [ext])
+
+  if (ext == null) return <span className="text-muted-foreground">—</span>
+  if (loading && !name) return <span className="text-muted-foreground">cargando…</span>
+  if (ext === -1) return <span className="text-muted-foreground">No asignado</span>
+
+  return name ? (
+    <span className="whitespace-nowrap">
+      {name} <span className="text-muted-foreground">(ext. {ext})</span>
+    </span>
+  ) : (
+    <span className="whitespace-nowrap">
+      <span className="text-muted-foreground">Ext.</span> {ext}
+    </span>
+  )
+}
+
+// ============================
 // Columnas
 // ============================
 const columns: ColumnDef<RowType>[] = [
-  // Checkbox
   {
     id: "select",
     header: ({ table }) => (
@@ -559,7 +567,7 @@ const columns: ColumnDef<RowType>[] = [
     header: "Tipo de solicitud",
     cell: ({ row }) => {
       const raw = row.original.tipo_solicitud ?? "—"
-      const norm = normalizeTipoSolicitudRaw(raw) // Incidente | Requerimiento | Consulta de caso | "none"
+      const norm = normalizeTipoSolicitudRaw(raw)
       const label = raw === "-" || !raw ? "—" : raw
 
       const isLargeForm = norm === "Requerimiento" || norm === "Incidente"
@@ -575,7 +583,6 @@ const columns: ColumnDef<RowType>[] = [
           </DialogTrigger>
 
           {norm === "none" ? (
-            // Fallback cuando no hay tipo (o "-"): modal simple
             <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Tipo de solicitud</DialogTitle>
@@ -583,7 +590,6 @@ const columns: ColumnDef<RowType>[] = [
               <TipoSolicitudModalFallback item={row.original} />
             </DialogContent>
           ) : isLargeForm ? (
-            // 🔹 SOLO para Requerimiento e Incidente: header sticky + cuerpo scrollable
             <DialogContent className="sm:max-w-3xl p-0">
               <DialogHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
                 <DialogTitle>{norm}</DialogTitle>
@@ -599,7 +605,6 @@ const columns: ColumnDef<RowType>[] = [
               </div>
             </DialogContent>
           ) : (
-            // Consulta de caso (u otros que ya se ven bien): sin cambios
             <DialogContent className="sm:max-w-3xl">
               <DialogHeader>
                 <DialogTitle>{norm}</DialogTitle>
@@ -621,20 +626,26 @@ const columns: ColumnDef<RowType>[] = [
   // 3) Estado (placeholder)
   { id: "estado", header: "Estado", cell: () => <span className="text-muted-foreground">—</span> },
 
-  // 4) Gestor Asignado (placeholder)
+  // 4) Gestor Asignado (resuelve por extensión)
   {
-  id: "gestor_asignado",
-  header: "Extensión Asignada",
-  accessorKey: "extension",
-  cell: ({ row }) => {
-    const ext = row.original.extension
-    return (
-      <span className={ext && ext > 0 ? "font-semibold" : "text-muted-foreground"}>
-        {ext && ext > 0 ? ext : "—"}
-      </span>
-    )
+    id: "gestor_asignado",
+    header: "Gestor asignado",
+    accessorKey: "extension",
+    cell: ({ row }) => {
+      // Usa el valor de la celda para evitar depender de row.original si viene string
+      const v = row.getValue("extension") as unknown
+      const ext =
+        v == null
+          ? null
+          : typeof v === "number"
+          ? v
+          : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
+          ? Number(v)
+          : null
+      return <GestorCell ext={ext} />
+    },
   },
-},
+
   // ——— Complementarias ———
   { accessorKey: "id_llamada", header: "id_llamada" },
   { accessorKey: "phone", header: "Teléfono" },
@@ -662,14 +673,7 @@ const columns: ColumnDef<RowType>[] = [
       row.original.en_horario ? <Badge variant="outline">En horario</Badge> : <span className="text-muted-foreground">Fuera de horario</span>,
   },
 
-  // 🔹 Variables extraídas → “Ver detalles” (modal)
-  {
-    accessorKey: "extracted_variables",
-    header: "Variables extraídas",
-    cell: ({ row }) => <ExtractedVarsCell item={row.original} />,
-  },
-
-  // 🔹 Transcripción (chat)
+  { accessorKey: "extracted_variables", header: "Variables extraídas", cell: ({ row }) => <ExtractedVarsCell item={row.original} /> },
   { id: "transcript_chat", header: "Transcripción", cell: ({ row }) => <TranscriptCell item={row.original} /> },
 
   {
