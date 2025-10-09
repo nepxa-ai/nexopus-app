@@ -1,8 +1,6 @@
-
-//export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-export const API_URL = "http://localhost:8000"; // ← forzado SOLO para probar
-
+// lib/api.ts
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export async function apiLogin(data: { username: string; password: string }) {
   const body = new URLSearchParams();
@@ -15,11 +13,11 @@ export async function apiLogin(data: { username: string; password: string }) {
     body,
   });
 
-  
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Error de autenticación");
   }
+
   return (await res.json()) as { access_token: string; token_type: "bearer" };
 }
 
