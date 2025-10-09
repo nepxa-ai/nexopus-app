@@ -662,24 +662,29 @@ const columns: ColumnDef<RowType>[] = [
   { id: "estado", header: "Estado", cell: () => <span className="text-muted-foreground">—</span> },
 
   // 4) Gestor Asignado (resuelve por extensión)
-  {
-    id: "gestor_asignado",
-    header: "Gestor asignado",
-    accessorKey: "extension",
-    cell: ({ row }) => {
-      // Usa el valor de la celda para evitar depender de row.original si viene string
-      const v = row.getValue("extension") as unknown
-      const ext =
-        v == null
-          ? null
-          : typeof v === "number"
-          ? v
-          : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
-          ? Number(v)
-          : null
-      return <GestorCell ext={ext} />
-    },
+{
+  id: "extension",
+  accessorKey: "extension",
+  header: "Extensión Asignada",
+  cell: ({ row }) => {
+    const v = row.getValue<number | string | null>("extension")
+    const ext =
+      v == null
+        ? null
+        : typeof v === "number"
+        ? v
+        : (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)))
+        ? Number(v)
+        : null
+
+    return (
+      <span className={ext && ext > 0 ? "font-semibold" : "text-muted-foreground"}>
+        {ext && ext > 0 ? ext : "—"}
+      </span>
+    )
   },
+},
+
 
   // ——— Complementarias ———
   { accessorKey: "id_llamada", header: "id_llamada" },
