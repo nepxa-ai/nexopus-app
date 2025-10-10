@@ -7,6 +7,10 @@ import { toast } from "sonner"
 import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
 import { fetchUserByExtensionLite } from "@/lib/api-users"
 
+import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
+import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
+
+
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -254,7 +258,28 @@ const booleanTriStateFilter = (
 // ============================
 // Drawer de detalle (Id atención)
 // ============================
+// 
 function IdAtencionCell({ item }: { item: RowType }) {
+  const [incident, setIncident] = React.useState<any | null>(null)
+  const [loading, setLoading] = React.useState(false)
+  const [editable, setEditable] = React.useState(false)
+
+  const isIncident = item.tipo_solicitud?.toLowerCase().includes("inci")
+
+  async function loadIncident() {
+    if (!isIncident || !item.id_dialvox_) return
+    setLoading(true)
+    try {
+      const res = await fetchIncidentByDialvox(item.id_dialvox_)
+      setIncident(res)
+      setEditable(true)
+    } catch (e) {
+      toast.error("Error al cargar incidente")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const headerText =
     (item.id_dialvox_ != null ? String(item.id_dialvox_) : null) ??
     item.id_llamada ??
@@ -263,7 +288,11 @@ function IdAtencionCell({ item }: { item: RowType }) {
   return (
     <Drawer>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
+        <Button
+          variant="link"
+          className="text-foreground w-fit px-0 text-left"
+          onClick={loadIncident}
+        >
           {headerText}
         </Button>
       </DrawerTrigger>
@@ -271,60 +300,75 @@ function IdAtencionCell({ item }: { item: RowType }) {
       <DrawerContent>
         <DrawerHeader className="gap-1">
           <DrawerTitle>{headerText}</DrawerTitle>
-          <DrawerDescription>Detalle atención</DrawerDescription>
+          <DrawerDescription>
+            {isIncident ? "Detalle de incidente" : "Detalle de atención"}
+          </DrawerDescription>
         </DrawerHeader>
 
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Inicio</span>
-              <span className="font-medium">{fmtDT(item.started_at)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Fin</span>
-              <span className="font-medium">{fmtDT(item.ended_at)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Duración</span>
-              <span className="font-medium">{secondsToHMS(item.duration_sec)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Creado</span>
-              <span className="font-medium">{fmtDT(item.created_at)}</span>
-            </div>
-          </div>
+        <div className="p-4 overflow-y-auto max-h-[75vh]">
+          {loading && <p>Cargando incidente...</p>}
 
-          {item.recording_url ? (
-            <div className="mt-1">
-              <a
-                href={item.recording_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline underline-offset-4"
-              >
-                Ver/escuchar grabación
-              </a>
-            </div>
-          ) : null}
-
-          <Separator />
-          <div className="grid gap-2">
-            <div className="text-xs text-muted-foreground">Cliente</div>
-            <div className="font-medium">{item.nombre_cliente ?? "—"}</div>
-          </div>
-
-          <Separator />
-          <div className="grid gap-2">
-            <div className="text-xs text-muted-foreground">Transcript (texto plano)</div>
-            <div className="text-muted-foreground">{item.transcript_text ?? "—"}</div>
-          </div>
+          {editable && incident ? (
+            <FormIncidente
+              item={incident}
+              onSubmit={async (formValues) => {
+                try {
+                  const patched = await updateIncidentByDialvox(item.id_dialvox_, formValues)
+                  toast.success("Incidente actualizado correctamente")
+                  await sendIncidentToITSM(patched)
+                  toast.success("Incidente enviado al ITSM")
+                } catch {
+                  toast.error("Error actualizando o enviando incidente")
+                }
+              }}
+            />
+          ) : (
+            !loading && (
+              <div className="text-sm text-muted-foreground">
+                {isIncident
+                  ? "Haz clic para cargar los detalles del incidente"
+                  : "Atención sin incidente asociado"}
+              </div>
+            )
+          )}
         </div>
 
-        <DrawerFooter>
-          <DrawerClose asChild>
-            <Button variant="outline">Cerrar</Button>
-          </DrawerClose>
-        </DrawerFooter>
+        {incident && (
+          <DrawerFooter className="flex flex-col gap-2">
+            <Button
+              onClick={async () => {
+                try {
+                  const patched = await updateIncidentByDialvox(item.id_dialvox_, incident)
+                  toast.success("Aprobado con ajustes")
+                  await sendIncidentToITSM(patched)
+                  toast.success("Enviado al ITSM")
+                } catch {
+                  toast.error("Error al aprobar o enviar incidente")
+                }
+              }}
+            >
+              Aprobar con ajustes
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await sendIncidentToITSM(incident)
+                  toast.success("Incidente enviado al ITSM")
+                } catch {
+                  toast.error("Error al enviar al ITSM")
+                }
+              }}
+            >
+              Enviar al ITSM
+            </Button>
+
+            <DrawerClose asChild>
+              <Button variant="ghost">Cerrar</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        )}
       </DrawerContent>
     </Drawer>
   )

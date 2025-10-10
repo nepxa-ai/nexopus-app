@@ -220,6 +220,12 @@ export default function FormIncidente({ item, onSubmit }: Props) {
         />
       </div>
 
+          <div className="flex justify-end gap-2 mt-6">
+      <Button type="submit" variant="default">
+        Guardar cambios
+      </Button>
+    </div>
+
     </form>
   )
 }
