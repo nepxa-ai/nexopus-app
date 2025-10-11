@@ -1,4 +1,5 @@
 "use client"
+
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { CaseItem } from "./types"
 import { opcionesIncidente } from "./opciones"
-
-type Props = { item: CaseItem; onSubmit?: (payload: any) => void }
+// Si quieres tipar estrictamente el item, ajusta este tipo con tu schema real del backend
+type Props = { item: any; onSubmit?: (payload: any) => void }
 
 export default function FormIncidente({ item, onSubmit }: Props) {
+  // ==================== ESTADO LOCAL ====================
   const [v, setV] = React.useState({
     // Cliente
     contacto: "Andrea Herrera",
@@ -39,6 +40,100 @@ export default function FormIncidente({ item, onSubmit }: Props) {
       "1. Requerimos realizar un backup del servidor asterisk tanto de la aplicación como la base de datos...",
   })
 
+  // ==================== HELPERS DE NORMALIZACIÓN ====================
+  const toTitle = (s?: string | null) =>
+    (s ?? "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())
+
+  // Busca (case-insensitive) dentro de una lista y devuelve el valor normalizado o fallback
+  function normalizeToOption(value: string | undefined, options: string[], fallback: string) {
+    if (!value) return fallback
+    const idx = options.findIndex((o) => o.toLowerCase() === value.toLowerCase())
+    return idx >= 0 ? options[idx] : fallback
+  }
+
+  // Mapa status backend -> select estado local
+  function mapStatusToEstado(status?: string | null) {
+    const v = (status ?? "").toLowerCase()
+    if (v.includes("active") || v.includes("open") || v.includes("abierto")) return "Abierto"
+    if (v.includes("progress") || v.includes("en progreso")) return "En Progreso"
+    if (v.includes("closed") || v.includes("cerrado")) return "Cerrado"
+    return "Abierto"
+  }
+
+  // Si quieres usar prioridad numérica como "urgencia"
+  function mapPriorityToUrgency(p?: string | number | null) {
+    const n = typeof p === "string" ? parseInt(p, 10) : (p ?? 0)
+    if (n === 1) return "Alto"
+    if (n === 2) return "Medio"
+    if (n === 3) return "Bajo"
+    return "Medio"
+  }
+
+  // ==================== HIDRATAR FORM CON DATOS DEL BACKEND ====================
+  React.useEffect(() => {
+    if (!item) return
+    // Ejemplo real del backend (curl):
+    // {
+    //  status_system, ticket, service, category, subcategory, detalle, profile_link,
+    //  symptom, subject, owner_team, priority, status, source, is_vip,
+    //  nombre_cliente, correo_cliente, empresa_cliente, id_dialvox_, ...
+    // }
+    const {
+      service,
+      category,
+      subcategory,
+      detalle,
+      subject,
+      symptom,
+      owner_team,
+      priority,
+      status,
+      is_vip,
+      nombre_cliente,
+      correo_cliente,
+      empresa_cliente,
+    } = item as any
+
+    const servicio = normalizeToOption(toTitle(service), opcionesIncidente.servicio, opcionesIncidente.servicio[0])
+    const categoria = normalizeToOption(toTitle(category), opcionesIncidente.categoria, opcionesIncidente.categoria[0])
+    const subcategoria = normalizeToOption(
+      toTitle(subcategory),
+      opcionesIncidente.subcategoria,
+      opcionesIncidente.subcategoria[0]
+    )
+    const estado = normalizeToOption(mapStatusToEstado(status), opcionesIncidente.estado, "Abierto")
+    const equipo = normalizeToOption(toTitle(owner_team), opcionesIncidente.equipo, opcionesIncidente.equipo[0])
+    const urgencia = normalizeToOption(mapPriorityToUrgency(priority), opcionesIncidente.urgencia, "Medio")
+    const impacto = normalizeToOption("Medio", opcionesIncidente.impacto, "Medio") // si no viene del backend
+
+    setV((prev) => ({
+      ...prev,
+      // Cliente
+      contacto: nombre_cliente ?? prev.contacto,
+      telefono: prev.telefono, // no viene en API: conserva default o integra cuando esté disponible
+      correo: correo_cliente ?? prev.correo,
+      vip: (is_vip ?? prev.vip) as boolean,
+      organizacion: empresa_cliente ?? prev.organizacion,
+      nit: prev.nit, // no viene en API
+      direccion: prev.direccion, // no viene en API
+      // Servicio
+      servicio,
+      categoria,
+      subcategoria,
+      detalle: detalle ?? prev.detalle,
+      estado,
+      equipo,
+      propietario: prev.propietario, // mapea cuando lo exponga el backend
+      urgencia,
+      impacto,
+      prioridad: String(priority ?? prev.prioridad),
+      // Incidente
+      resumen: subject ?? prev.resumen,
+      descripcion: symptom ?? prev.descripcion,
+    }))
+  }, [item])
+
+  // ==================== UI FORM ====================
   return (
     <form
       className="flex flex-col gap-6"
@@ -220,12 +315,11 @@ export default function FormIncidente({ item, onSubmit }: Props) {
         />
       </div>
 
-          <div className="flex justify-end gap-2 mt-6">
-      <Button type="submit" variant="default">
-        Guardar cambios
-      </Button>
-    </div>
-
+      <div className="flex justify-end gap-2 mt-6">
+        <Button type="submit" variant="default">
+          Guardar cambios
+        </Button>
+      </div>
     </form>
   )
 }
