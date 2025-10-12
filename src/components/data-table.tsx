@@ -967,30 +967,70 @@ export default function DataTable() {
   const [error, setError] = React.useState<string | null>(null)
   const [page, setPage] = React.useState<PaginatedWebhooks | null>(null)
 
-  React.useEffect(() => {
-    let abort = false
-    ;(async () => {
+  // Refetch centralizado (lo usan el efecto de carga y el SSE)
+const refetch = React.useCallback(async () => {
+  try {
+    setLoading(true)
+    setError(null)
+    const res = await fetchWebhookEvents({
+      page: pageIndex + 1,
+      page_size: pageSize,
+      phone: serverFilters.phone,
+      id_llamada: serverFilters.id_llamada,
+    })
+    setPage(res)
+  } catch (e: any) {
+    setError(e?.message ?? "Error cargando eventos")
+    toast.error("No se pudo cargar eventos")
+  } finally {
+    setLoading(false)
+  }
+}, [pageIndex, pageSize, serverFilters])
+
+
+React.useEffect(() => {
+  refetch()
+}, [refetch])
+
+ // Suscripción SSE con reintento exponencial y refetch directo
+React.useEffect(() => {
+  let es: EventSource | null = null
+  let retryMs = 2000
+
+  const connect = () => {
+    es = new EventSource('/api/stream/webhooks')
+
+    es.onopen = () => {
+      console.log('[SSE] conectado')
+      retryMs = 2000
+    }
+
+    es.onmessage = (event) => {
       try {
-        setLoading(true)
-        setError(null)
-        const res = await fetchWebhookEvents({
-          page: pageIndex + 1,
-          page_size: pageSize,
-          phone: serverFilters.phone,
-          id_llamada: serverFilters.id_llamada,
-        })
-        if (!abort) setPage(res)
-      } catch (e: any) {
-        if (!abort) {
-          setError(e?.message ?? "Error cargando eventos")
-          toast.error("No se pudo cargar eventos")
+        const data = JSON.parse(event.data)
+        console.log('[SSE] Evento:', data)
+        if (data?.type === 'webhook_event_created' || data?.type === 'incident_updated') {
+          refetch()  // ← recarga la tabla
         }
-      } finally {
-        if (!abort) setLoading(false)
+      } catch (err) {
+        console.error('[SSE] Error parseando evento:', err)
       }
-    })()
-    return () => { abort = true }
-  }, [pageIndex, pageSize, serverFilters])
+    }
+
+    es.onerror = () => {
+      console.warn('[SSE] error – reintentando en', retryMs, 'ms')
+      es?.close()
+      es = null
+      setTimeout(connect, retryMs)
+      retryMs = Math.min(retryMs * 2, 30000) // backoff máx 30s
+    }
+  }
+
+  connect()
+  return () => { es?.close(); es = null }
+}, [refetch])
+
+
 
   const items: RowType[] = React.useMemo(() => {
     const src = page?.items ?? []

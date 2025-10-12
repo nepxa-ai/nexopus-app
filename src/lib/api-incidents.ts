@@ -1,7 +1,9 @@
 function authHeaders() {
   if (typeof window === "undefined") return {}
   const token = localStorage.getItem("access_token")
-  return token ? { Authorization: `Bearer ${token}`, "content-type": "application/json" } : { "content-type": "application/json" }
+  return token
+    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+    : { "Content-Type": "application/json" }
 }
 
 export async function fetchIncidentByDialvox(id_dvx: number | string) {
@@ -23,12 +25,10 @@ export async function updateIncidentByDialvox(id_dvx: number | string, data: any
   return r.json()
 }
 
-// Si tu webhook está detrás del mismo Nginx y no requiere auth, puede ir sin token.
-// Si prefieres, también puedes exponerlo vía /api/... y que Nginx lo proxyee.
 export async function sendIncidentToITSM(data: any) {
-  const r = await fetch(`https://10.34.7.10:5678/webhook/crear-incidente-itsm`, {
+  const r = await fetch(`/webhook/crear-incidente-itsm`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   })
   if (!r.ok) throw new Error(`Error al enviar al ITSM (HTTP ${r.status})`)
