@@ -1,9 +1,7 @@
 "use client";
 
 import * as React from "react";
-
 import { useRouter } from "next/navigation";
-
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,7 +49,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             <div className="flex flex-col items-center text-center">
               {/* Logo pequeño encima del título */}
               <Image
-                src="/images/logo-completo-nexopus-pulpo-color.png"   // 📌 guarda este archivo en /public/images/
+                src="/images/logo-completo-nexopus-pulpo-color.png"   // imagen en public/images/
                 alt="Logo Nexopus"
                 width={320}   // tamaño pequeño
                 height={240}
@@ -112,9 +110,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           {/* Columna derecha con logo centrado (sin fill) */}
           <div className="hidden md:flex items-center justify-center bg-muted p-8">
             <Image
-              src="/images/logo-open-group-small.png" // renombra el archivo
+              src="/images/logo-open-group-small.png" // imagen en public/images/
               alt="Logo Open Group"
-              width={320}              // ajusta el tamaño a tu gusto (p.ej. 240-360)
+              width={320}              // ajuste del 
               height={320}
               priority
               className="object-contain h-auto w-auto max-h-[360px] max-w-[80%]"

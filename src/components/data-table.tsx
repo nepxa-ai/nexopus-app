@@ -1,15 +1,7 @@
 "use client"
-
 import * as React from "react"
 import { z } from "zod"
 import { toast } from "sonner"
-
-import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
-import { fetchUserByExtensionLite } from "@/lib/api-users"
-
-import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
-import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
-
 
 import {
   ColumnDef,
@@ -36,6 +28,7 @@ import {
   IconLayoutColumns,
   IconRobot,
   IconUser,
+  IconX
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -51,14 +44,17 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
+
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
 import {
   Select,
   SelectContent,
@@ -66,7 +62,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
+
 import {
   Table,
   TableBody,
@@ -75,6 +71,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import {
   Dialog,
@@ -82,10 +79,22 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription, 
+  DialogClose
 } from "@/components/ui/dialog"
 
-import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
+
+
 import type { CaseItem } from "@/components/ui/forms-proceso/types"
+
+import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
+import { fetchUserByExtensionLite } from "@/lib/api-users"
+import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
+
+
+import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
+
+import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
 
 // ============================
 // Utils
@@ -264,6 +273,8 @@ function IdAtencionCell({ item }: { item: RowType }) {
   const [loading, setLoading] = React.useState(false)
   const [editable, setEditable] = React.useState(false)
 
+  
+
   const isIncident = item.tipo_solicitud?.toLowerCase().includes("inci")
 
   async function loadIncident() {
@@ -371,6 +382,146 @@ function IdAtencionCell({ item }: { item: RowType }) {
         )}
       </DrawerContent>
     </Drawer>
+  )
+}
+
+function IncidentDialog(
+  { row, 
+    onAfterChange,}:
+    {row: RowType 
+    onAfterChange?: () => void}) {
+      const [loading, setLoading] = React.useState(false)
+      const [incident, setIncident] = React.useState<any | null>(null)
+      const [editing, setEditing] = React.useState(false)
+      const [saved, setSaved] = React.useState(false)
+
+      const headerText =
+      (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ??
+      row.id_llamada ?? "—"
+
+    async function load() {
+    if (!row.id_dialvox_) return
+    setLoading(true)
+    try {
+      const res = await fetchIncidentByDialvox(row.id_dialvox_)
+      setIncident(res)
+    } catch {
+      toast.error("No se pudo cargar el incidente")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function aprobar() {
+    const id = row.id_dialvox_
+    if (!id) {
+      toast.error("No hay id_dialvox_")
+      return
+    }
+    try {
+      await sendIncidentToITSM({ id_dialvox_: String(id) })    // ← solo el ID
+      toast.success("Incidente aprobado y enviado a n8n")
+      onAfterChange?.()          // refresca DataTable si lo usas
+    } catch {
+      toast.error("Error enviando a n8n")
+    }
+  }
+
+
+  async function guardarYEnviar(payload?: any) {
+  if (!row.id_dialvox_) return
+  try {
+    if (!payload || Object.keys(payload).length === 0) {
+      toast.error("No hay cambios para enviar")
+      return
+    }
+    const patched = await updateIncidentByDialvox(row.id_dialvox_, payload)
+    setIncident(patched)
+    toast.success("Incidente actualizado")
+    await sendIncidentToITSM(patched)
+    toast.success("Enviado a n8n")
+    setEditing(false)
+    onAfterChange?.()
+  }  
+  catch {
+    toast.error("Error al actualizar o enviar")
+  }
+  }
+
+  return (
+    <Dialog
+      onOpenChange={(open) => {
+        if (open && !incident && !loading) load()
+        if (!open) {
+          setEditing(false)
+          setSaved(false)
+
+          
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
+          <Badge variant="outline" className="px-1.5 text-muted-foreground">
+            Incidente
+          </Badge>
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-3xl p-0">
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
+          <DialogHeader>
+            <DialogTitle>Incidente · {headerText}</DialogTitle>
+            
+            {/* Botón de cierre (X) */}
+            <DialogClose asChild>
+              <button
+                className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                aria-label="Cerrar"
+              >
+                <IconX className="h-5 w-5" />
+              </button>
+            </DialogClose>
+          </DialogHeader>
+        </div>
+
+        <div className="max-h-[78vh] overflow-y-auto px-6 py-5">
+          {loading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+
+          {!loading && incident && 
+          (<FormIncidente
+              item={incident}
+              readOnly={!editing}
+              hideSubmit={false}               // ← muestra el botón interno del form
+              onSubmit={async (payload) => {  // ← usa SIEMPRE el payload del form
+                await guardarYEnviar(payload)
+              }}
+            />
+          )}
+
+          {!loading && !incident && (
+            <div className="text-sm text-muted-foreground">No hay datos del incidente.</div>
+          )}
+        </div>
+        
+        <div className="flex items-center justify-end gap-2 px-6 pb-5">
+          {!editing ? (
+            <>
+              <Button variant="secondary" onClick={() => setEditing(true)}>Editar</Button>
+              <Button variant="default" onClick={aprobar}>Aprobar</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setEditing(false)}>Cancelar</Button>
+              {/*
+                <Button onClick={async () => await guardarYEnviar()}>Guardar y enviar</Button>
+              */}
+            </>
+          )}
+        </div>
+        
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -496,10 +647,10 @@ function toObjectOrNull(v: unknown): Record<string, Json> | null {
 const isEmpty = (o: Record<string, Json> | null) => !o || Object.keys(o).length === 0
 
 function PrettyValue({ value }: { value: Json }) {
-  if (value === null || typeof value === "undefined" || value === "") {
+  if (value === null || typeof value === "undefined" || value === ""){
     return <span className="text-muted-foreground">—</span>
   }
-  if (typeof value === "boolean") return value ? <span>Sí</span> : <span>No</span>
+  if (typeof value === "boolean") return value ? <span>Si</span> : <span>No</span>
   if (typeof value === "number") return <span>{value}</span>
   if (typeof value === "string") return <span className="whitespace-pre-wrap">{value}</span>
   if (Array.isArray(value)) return <span className="whitespace-pre-wrap text-sm">{value.map(String).join(", ")}</span>
@@ -603,77 +754,132 @@ function GestorCell({ ext }: { ext: number | null }) {
 // ============================
 // Columnas
 // ============================
-const columns: ColumnDef<RowType>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
-          aria-label="Seleccionar todos"
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(v) => row.toggleSelected(!!v)}
-          aria-label="Seleccionar fila"
-        />
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
+function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
+  const columns: ColumnDef<RowType>[] = [
+    // Columna de selección
+    { id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+            aria-label="Seleccionar todos"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(v) => row.toggleSelected(!!v)}
+            aria-label="Seleccionar fila"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
 
-  // 1) Id atención
-  {
-    id: "id_atencion",
-    header: "Id atención",
-    accessorFn: (row) => (row.id_dialvox_ != null ? String(row.id_dialvox_) : "—"),
-    cell: ({ row }) => <IdAtencionCell item={row.original} />,
-    enableHiding: false,
-  },
+    // 1) Id atención
+    { id: "id_atencion",
+      header: "Id atención",
+      accessorFn: (row) => (row.id_dialvox_ != null ? String(row.id_dialvox_) : "—"),
+      cell: ({ row }) => <IdAtencionCell item={row.original} />,
+      enableHiding: false,
+      enableSorting: false,
+    },
 
-  // 2) Tipo de solicitud
-  {
-    accessorKey: "tipo_solicitud",
-    header: "Tipo de solicitud",
-    cell: ({ row }) => {
-      const raw = row.original.tipo_solicitud ?? "—"
-      const norm = normalizeTipoSolicitudRaw(raw)
-      const label = raw === "-" || !raw ? "—" : raw
+    // 1.5) Finalizar atención (después de "Id atención")
+    {
+      id: "finalizar",
+      header: "Finalizar",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const item = row.original as RowType
 
-      const isLargeForm = norm === "Requerimiento" || norm === "Incidente"
+        return (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={async () => {
+              try {
+                if (!item?.id) {
+                  toast.error("No se encontró el ID del webhook")
+                  return
+                }
 
-      return (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
-              <Badge variant="outline" className="px-1.5 text-muted-foreground">
-                {label}
-              </Badge>
-            </Button>
-          </DialogTrigger>
+                // Ajusta el nombre del campo según tu backend: estado_caso o estado
+                await updateWebhookById(item.id, { estado_caso: "Por revisar" })
 
-          {norm === "none" ? (
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Tipo de solicitud</DialogTitle>
-              </DialogHeader>
-              <TipoSolicitudModalFallback item={row.original} />
-            </DialogContent>
-          ) : isLargeForm ? (
-            <DialogContent className="sm:max-w-3xl p-0">
-              <DialogHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
-                <DialogTitle>{norm}</DialogTitle>
-              </DialogHeader>
-              <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+                toast.success("Atención marcada como 'Por revisar'")
+                await refetch() // recarga la tabla
+              } catch {
+                toast.error("No se pudo actualizar el estado")
+              }
+            }}
+          >
+            Finalizar
+          </Button>
+        )
+      },
+    },
+
+    // 2) Tipo de solicitud
+    { accessorKey: "tipo_solicitud",
+      header: "Tipo de solicitud",
+      cell: ({ row }) => {
+        const raw = row.original.tipo_solicitud ?? "—"
+        const norm = normalizeTipoSolicitudRaw(raw)
+        const label = raw === "-" || !raw ? "—" : raw
+
+        if (norm === "Incidente") {
+          //refetch ahora viene como argumento
+          return <IncidentDialog row={row.original} onAfterChange={refetch} />
+        }
+
+        const isLargeForm = norm === "Requerimiento"
+
+        return (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
+                <Badge variant="outline" className="px-1.5 text-muted-foreground">
+                  {label}
+                </Badge>
+              </Button>
+            </DialogTrigger>
+
+            {norm === "none" ? (
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Tipo de solicitud</DialogTitle>
+                </DialogHeader>
+                <TipoSolicitudModalFallback item={row.original} />
+              </DialogContent>
+            ) : isLargeForm ? (
+              <DialogContent className="sm:max-w-3xl p-0">
+                <DialogHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4">
+                  <DialogTitle>{norm}</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+                  <CaseFormRouter
+                    item={rowToCaseItem(row.original)}
+                    onSubmit={(payload) => {
+                      console.log("payload form:", payload)
+                      toast.success("Formulario capturado")
+                    }}
+                  />
+                </div>
+              </DialogContent>
+            ) : (
+              <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>{norm}</DialogTitle>
+                </DialogHeader>
                 <CaseFormRouter
                   item={rowToCaseItem(row.original)}
                   onSubmit={(payload) => {
@@ -681,161 +887,180 @@ const columns: ColumnDef<RowType>[] = [
                     toast.success("Formulario capturado")
                   }}
                 />
-              </div>
-            </DialogContent>
-          ) : (
-            <DialogContent className="sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>{norm}</DialogTitle>
-              </DialogHeader>
-              <CaseFormRouter
-                item={rowToCaseItem(row.original)}
-                onSubmit={(payload) => {
-                  console.log("payload form:", payload)
-                  toast.success("Formulario capturado")
-                }}
-              />
-            </DialogContent>
-          )}
-        </Dialog>
-      )
+              </DialogContent>
+            )}
+          </Dialog>
+        )
+      },
     },
-  },
 
-  // 3) Estado (placeholder)
-  { id: "estado", header: "Estado", cell: () => <span className="text-muted-foreground">—</span> },
+    // 3) Estado (placeholder)
+    { id: "estado", 
+      header: "Estado", 
+      cell: () => <span className="text-muted-foreground">—</span>
+    },
 
-  // 4) Gestor Asignado (resuelve por extensión)
-{
-  id: "extension",
-  accessorKey: "extension",
-  header: "Extensión Asignada",
-  cell: ({ row }) => {
-    const v = row.getValue<number | string | null>("extension")
-    const ext =
-      v == null
-        ? null
-        : typeof v === "number"
-        ? v
-        : (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)))
-        ? Number(v)
-        : null
+    // 4) Extensión asignada
+    { id: "extension",
+      accessorKey: "extension",
+      header: "Extensión Asignada",
+      cell: ({ row }) => {
+        const v = row.getValue<number | string | null>("extension")
+        const ext =
+          v == null
+            ? null
+            : typeof v === "number"
+            ? v
+            : (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)))
+            ? Number(v)
+            : null
 
-    return (
-      <span className={ext && ext > 0 ? "font-semibold" : "text-muted-foreground"}>
-        {ext && ext > 0 ? ext : "—"}
-      </span>
-    )
-  },
-},
+        return (
+          <span className={ext && ext > 0 ? "font-semibold" : "text-muted-foreground"}>
+            {ext && ext > 0 ? ext : "—"}
+          </span>
+        )
+      },
+    },
+
+    // 5) Id de la llamada {id_llamada} -> identificador de la grabación de la llamada.
+    { accessorKey:"id_llamada", 
+      header: "id_llamada" 
+    },
+    
+    // 6) Teléfono de la llamda entrante
+    { accessorKey: "phone", 
+      header: "Teléfono"
+    },
+    
+    // 7) Duracion llamada voicebot
+    { id: "duracion",
+      header: () => <span className="whitespace-pre-line leading-tight">{"Duración\nmm:ss"}</span>,
+      cell: ({ row }) => <span>{secondsToHMS(row.original.duration_sec)}</span>,
+    },
+    
+    //8) Nombre del Cliente
+    { accessorKey: "nombre_cliente", 
+      header: "Nombre cliente"
+    },
+
+    //9) Empresa
+    { accessorKey: "empresa_cliente", 
+      header: "Empresa"
+    },
+    //10) VIP
+    { accessorKey: "es_vip",
+      header: "VIP",
+      filterFn: "booleanTri",
+      cell: ({ row }) =>
+        row.original.es_vip ? <Badge variant="secondary">VIP</Badge> : <span className="text-muted-foreground">No</span>,
+    },
+    
+    //11) En horario de llamada
+    /*
+    { accessorKey: "en_horario",
+      header: "en_horario",
+      filterFn: "booleanTri",
+      cell: ({ row }) =>
+        row.original.en_horario ? <Badge variant="outline">En horario</Badge> : <span className="text-muted-foreground">Fuera de horario</span>,
+    },
+    */
+    //12) Variables extraidas del voicebot
+    { accessorKey: "extracted_variables",
+      header: "Variables extraídas", 
+      cell: ({ row }) => <ExtractedVarsCell item={row.original} />
+    },
+    
+    //13) Transcripcion del voicebot
+    { id: "transcript_chat", 
+      header: "Transcripción", 
+      cell: ({ row }) => <TranscriptCell item={row.original} /> 
+    },
+
+    //14) En horario de llamada
+    { accessorKey: "recording_url",
+      header: "Grabación",
+      cell: ({ row }) =>
+        row.original.recording_url ? (
+          <a href={row.original.recording_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">abrir</a>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+
+    //15) started_at
+    /*
+    { accessorKey: "started_at",
+      header: "started_at",
+      cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.started_at)}</span>,
+      sortingFn: (a, b) =>
+        (new Date(a.original.started_at || 0).getTime() || 0) -
+        (new Date(b.original.started_at || 0).getTime() || 0),
+      filterFn: "dateRange",
+    },
+    
+    //16 ended_at
+    { accessorKey: "ended_at",
+      header: "ended_at",
+      cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.ended_at)}</span>,
+      sortingFn: (a, b) =>
+        (new Date(a.original.ended_at || 0).getTime() || 0) -
+        (new Date(b.original.ended_at || 0).getTime() || 0),
+    },
+    */
+   
+    //17 fecha creación del registro
+    { accessorKey: "created_at",
+      header: "Creado",
+      cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.created_at)}</span>,
+      sortingFn: (a, b) =>
+        (new Date(a.original.created_at || 0).getTime() || 0) -
+        (new Date(b.original.created_at || 0).getTime() || 0),
+    },
+
+    // 18) Columna oculta para búsqueda global
+    { id: "search",
+      header: "search",
+      accessorFn: (row) =>
+        [
+          row.id_dialvox_ != null ? String(row.id_dialvox_) : "",
+          row.id_llamada,
+          row.phone,
+          row.nombre_cliente,
+          row.tipo_solicitud,
+          row.empresa_cliente,
+          row.transcript_text,
+          typeof row.extracted_variables === "string" ? row.extracted_variables : JSON.stringify(row.extracted_variables ?? ""),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase(),
+      filterFn: "includesString",
+      enableSorting: false,
+    }
+  ]
 
 
-  // ——— Complementarias ———
-  { accessorKey: "id_llamada", header: "id_llamada" },
-  { accessorKey: "phone", header: "Teléfono" },
-  {
-    id: "duracion",
-    header: () => <span className="whitespace-pre-line leading-tight">{"Duración\nmm:ss"}</span>,
-    cell: ({ row }) => <span>{secondsToHMS(row.original.duration_sec)}</span>,
-  },
-  { accessorKey: "nombre_cliente", header: "Nombre cliente" },
-  { accessorKey: "empresa_cliente", header: "Empresa" },
-
-  {
-    accessorKey: "es_vip",
-    header: "VIP",
-    filterFn: "booleanTri",
-    cell: ({ row }) =>
-      row.original.es_vip ? <Badge variant="secondary">VIP</Badge> : <span className="text-muted-foreground">No</span>,
-  },
-
-  {
-    accessorKey: "en_horario",
-    header: "en_horario",
-    filterFn: "booleanTri",
-    cell: ({ row }) =>
-      row.original.en_horario ? <Badge variant="outline">En horario</Badge> : <span className="text-muted-foreground">Fuera de horario</span>,
-  },
-
-  { accessorKey: "extracted_variables", header: "Variables extraídas", cell: ({ row }) => <ExtractedVarsCell item={row.original} /> },
-  { id: "transcript_chat", header: "Transcripción", cell: ({ row }) => <TranscriptCell item={row.original} /> },
-
-  {
-    accessorKey: "recording_url",
-    header: "Grabación",
-    cell: ({ row }) =>
-      row.original.recording_url ? (
-        <a href={row.original.recording_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">abrir</a>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      ),
-  },
-
-  {
-    accessorKey: "started_at",
-    header: "started_at",
-    cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.started_at)}</span>,
-    sortingFn: (a, b) =>
-      (new Date(a.original.started_at || 0).getTime() || 0) -
-      (new Date(b.original.started_at || 0).getTime() || 0),
-    filterFn: "dateRange",
-  },
-  {
-    accessorKey: "ended_at",
-    header: "ended_at",
-    cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.ended_at)}</span>,
-    sortingFn: (a, b) =>
-      (new Date(a.original.ended_at || 0).getTime() || 0) -
-      (new Date(b.original.ended_at || 0).getTime() || 0),
-  },
-  {
-    accessorKey: "created_at",
-    header: "Creado",
-    cell: ({ row }) => <span className="whitespace-nowrap">{fmtDT(row.original.created_at)}</span>,
-    sortingFn: (a, b) =>
-      (new Date(a.original.created_at || 0).getTime() || 0) -
-      (new Date(b.original.created_at || 0).getTime() || 0),
-  },
-
-  // Columna oculta para búsqueda global
-  {
-    id: "search",
-    header: "search",
-    accessorFn: (row) =>
-      [
-        row.id_dialvox_ != null ? String(row.id_dialvox_) : "",
-        row.id_llamada,
-        row.phone,
-        row.nombre_cliente,
-        row.tipo_solicitud,
-        row.empresa_cliente,
-        row.transcript_text,
-        typeof row.extracted_variables === "string" ? row.extracted_variables : JSON.stringify(row.extracted_variables ?? ""),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase(),
-    filterFn: "includesString",
-    enableSorting: false,
-  },
-]
+return columns
+}
 
 // ============================
 // Toolbar
 // ============================
+
 function Toolbar({
   table,
   serverFilters,
   onServerFilters,
   showServerFilters,
-}: {
+  }:{
   table: ReturnType<typeof useReactTable<RowType>>
   serverFilters: { phone?: string; id_llamada?: string }
   onServerFilters: (v: { phone?: string; id_llamada?: string }) => void
   showServerFilters?: boolean
-}) {
+  }) {
   const searchCol = table.getColumn("search")
-  const startedCol = table.getColumn("started_at")
+  //const startedCol = table.getColumn("started_at")
   const vipCol = table.getColumn("es_vip")
   const horarioCol = table.getColumn("en_horario")
 
@@ -955,6 +1180,8 @@ function Toolbar({
   )
 }
 
+
+
 // ============================
 // Componente principal
 // ============================
@@ -1046,6 +1273,8 @@ React.useEffect(() => {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
 
+  const columns = React.useMemo(() => getColumns(refetch), [refetch])
+   
   const table = useReactTable({
     data: items,
     columns,
@@ -1073,6 +1302,7 @@ React.useEffect(() => {
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    
     filterFns: {
       dateRange: dateRangeFilter,
       booleanTri: booleanTriStateFilter,
@@ -1088,12 +1318,13 @@ React.useEffect(() => {
 
   return (
     <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
+      {/*
       <Toolbar
         table={table}
         serverFilters={serverFilters}
         onServerFilters={setServerFilters}
         showServerFilters
-      />
+      /> */}
 
       <TabsContent value="outline" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
