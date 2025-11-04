@@ -31,3 +31,48 @@ export async function fetchUserByExtensionLite(ext: number): Promise<UserLite | 
   console.log("[DEBUG] Response OK:", data)
   return data
 }
+
+/* ---------- NUEVO: perfil propio ---------- */
+export type Me = {
+  id: number
+  nombres: string
+  apellidos: string
+  email: string
+  rol: "admin" | "user"
+  extension: number | null
+  activo: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export type MeUpdatePayload = {
+  nombres?: string
+  apellidos?: string
+  password?: string
+}
+
+export async function fetchMe(): Promise<Me> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+  const res = await fetch(`/api/users/me`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+    credentials: "include",
+  })
+  if (!res.ok) throw new Error("No se pudo obtener el perfil")
+  return res.json()
+}
+
+export async function patchMe(payload: MeUpdatePayload): Promise<Me> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+  const res = await fetch(`/api/users/me`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error("No se pudo actualizar el perfil")
+  return res.json()
+}

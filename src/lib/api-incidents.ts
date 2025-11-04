@@ -27,7 +27,7 @@ export async function updateIncidentByDialvox(id_dvx: number | string, data: any
 
 
 export async function sendIncidentToITSM(data: any) {
-  const r = await fetch(`https://10.34.7.10:5678/n8n/webhook-test/crear-incidente-ivanti`, {
+  const r = await fetch(`https://10.34.7.10:5678/n8n/webhook/crear-incidente-ivanti`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),

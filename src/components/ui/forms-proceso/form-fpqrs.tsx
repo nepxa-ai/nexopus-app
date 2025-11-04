@@ -12,7 +12,7 @@ import { Select,
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { opcionesITSM } from "@/components/ui/forms-proceso/opciones"
+import { opcionesITSM, opcionesITSM_fpqrs } from "@/components/ui/forms-proceso/opciones"
 
 type Props = {
   item?: any
@@ -65,9 +65,9 @@ function deriveLocalStateFromItem(it: any) {
   const propietario   = it?.propietario
 
   // Normalizaciones
-  const servicio   = normalizeToOption(toTitle(servicioRaw),  opcionesITSM.servicio, opcionesITSM.servicio[0])
-  const categoria  = normalizeToOption(toTitle(categoriaRaw), opcionesITSM.categoria, opcionesITSM.categoria[0])
-  const subcategoria = normalizeToOption(toTitle(subcatRaw),  opcionesITSM.subcategoria, opcionesITSM.subcategoria[0])
+  const servicio   = normalizeToOption(toTitle(servicioRaw),  opcionesITSM_fpqrs.servicio, opcionesITSM_fpqrs.servicio[0])
+  const categoria  = normalizeToOption(toTitle(categoriaRaw), opcionesITSM_fpqrs.categoria, opcionesITSM_fpqrs.categoria[0])
+  const subcategoria = normalizeToOption(toTitle(subcatRaw),  opcionesITSM_fpqrs.subcategoria, opcionesITSM_fpqrs.subcategoria[0])
   const estado     = normalizeToOption(mapStatusToEstado(estadoRaw), opcionesITSM.estado, "Abierto")
   const equipo     = normalizeToOption(toTitle(equipoRaw),   opcionesITSM.equipo, opcionesITSM.equipo[0])
   const urgencia   = normalizeToOption(String(urgenciaRaw ?? "Medio"), opcionesITSM.urgencia, "Medio")

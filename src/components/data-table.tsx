@@ -90,9 +90,12 @@ import type { CaseItem } from "@/components/ui/forms-proceso/types"
 import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
 import { fetchUserByExtensionLite } from "@/lib/api-users"
 import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
+import { fetchRequestByDialvox, updateRequestByDialvox, sendRequestToITSM } from "@/lib/api-requirements"
+import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRStToITSM } from "@/lib/api-fpqrs"
 
 
 import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
+import FormRequerimiento from "@/components/ui/forms-proceso/form-requerimiento"
 
 import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
 
@@ -145,6 +148,7 @@ function normalizeTipoSolicitudRaw(t?: string | null): CaseType | "none" {
   if (s.includes("inc")) return "Incidente"
   if (s.includes("req")) return "Requerimiento"
   if (s.includes("consult")) return "Consulta de caso"
+  if (s.includes("fpqrs")) return "fpqrs"
   return "none"
 }
 
@@ -386,31 +390,30 @@ function IdAtencionCell({ item }: { item: RowType }) {
 }
 
 function IncidentDialog(
-  { row, 
-    onAfterChange,}:
-    {row: RowType 
+  { row, onAfterChange,}:{row: RowType 
     onAfterChange?: () => void}) {
-      const [loading, setLoading] = React.useState(false)
-      const [incident, setIncident] = React.useState<any | null>(null)
-      const [editing, setEditing] = React.useState(false)
-      const [saved, setSaved] = React.useState(false)
+    const [loading, setLoading] = React.useState(false)
+    const [incident, setIncident] = React.useState<any | null>(null)
+    const [editing, setEditing] = React.useState(false)
+    const [saved, setSaved] = React.useState(false)
 
-      const headerText =
-      (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ??
-      row.id_llamada ?? "—"
+    const headerText = (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ?? row.id_llamada ?? "—"
 
     async function load() {
-    if (!row.id_dialvox_) return
-    setLoading(true)
-    try {
-      const res = await fetchIncidentByDialvox(row.id_dialvox_)
-      setIncident(res)
-    } catch {
-      toast.error("No se pudo cargar el incidente")
-    } finally {
-      setLoading(false)
+      if (!row.id_dialvox_) return
+      
+      setLoading(true)
+      try {
+        const res = await fetchIncidentByDialvox(row.id_dialvox_)
+        setIncident(res)
+      } 
+      catch {
+        toast.error("No se pudo cargar el incidente")
+      } 
+      finally {
+        setLoading(false)
+      }
     }
-  }
 
   async function aprobar() {
     const id = row.id_dialvox_
@@ -455,8 +458,6 @@ function IncidentDialog(
         if (!open) {
           setEditing(false)
           setSaved(false)
-
-          
         }
       }}
     >
@@ -524,6 +525,270 @@ function IncidentDialog(
     </Dialog>
   )
 }
+
+function RequestDialog(
+  { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }
+){
+  const [loading, setLoading] = React.useState(false)
+  const [request, setRequest] = React.useState<any | null>(null)
+  const [editing, setEditing] = React.useState(false)
+  const [saved, setSaved] = React.useState(false)
+
+  const headerText =
+    (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ??
+    row.id_llamada ?? "—"
+
+  async function load() {
+    if (!row.id_dialvox_) return
+    setLoading(true)
+    try {
+      const res = await fetchRequestByDialvox(row.id_dialvox_) //fetch (por id_dialvox)
+      setRequest(res)
+    } catch {
+      toast.error("No se pudo cargar el requerimiento")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function aprobar() {
+    const id = row.id_dialvox_
+    if (!id) {
+      toast.error("No hay id_dialvox_")
+      return
+    }
+    try {
+      await sendRequestToITSM({ id_dialvox_: String(id) }) // ← solo el ID
+      toast.success("Requerimiento aprobado y enviado a n8n")
+      onAfterChange?.()
+    } catch {
+      toast.error("Error enviando a n8n")
+    }
+  }
+
+  async function guardarYEnviarRequest(payload?: any) {
+    if (!row.id_dialvox_) return
+    try {
+      if (!payload || Object.keys(payload).length === 0) {
+        toast.error("No hay cambios para enviar")
+        return
+      }
+      const patched = await updateRequestByDialvox(row.id_dialvox_, payload) // ← mismo endpoint PATCH
+      setRequest(patched)
+      toast.success("Requerimiento actualizado")
+      // (opcional) enviar a n8n aquí si corresponde:
+      //await sendResquestToITSM(patched)
+      // toast.success("Enviado a n8n")
+      setSaved(true)              // si quieres mantener edición, usa saved + footer “Cerrar edición”
+      //setEditing(false)        // si prefieres cerrar edición al guardar, usa esta línea y quita saved
+      //onAfterChange?.()
+    } catch {
+      toast.error("Error al actualizar el requerimiento")
+    }
+  }
+
+  return (
+    <Dialog
+      onOpenChange={(open) => {
+        if (open && !request && !loading) load()
+        if (!open) { setEditing(false); setSaved(false) }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
+          <Badge variant="outline" className="px-1.5 text-muted-foreground">
+            Requerimiento
+          </Badge>
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-3xl p-0">
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
+          <DialogHeader>
+            <DialogTitle>Requerimiento · {headerText}</DialogTitle>
+            <DialogClose asChild>
+              <button
+                className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                aria-label="Cerrar"
+              >
+                <IconX className="h-5 w-5" />
+              </button>
+            </DialogClose>
+          </DialogHeader>
+        </div>
+
+        <div className="max-h-[78vh] overflow-y-auto px-6 py-5">
+          {loading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+
+          {!loading && request && (
+            <FormRequerimiento
+              item={request}
+              readOnly={!editing}
+              hideSubmit={false}
+              onSubmit={async (payload) => {
+                await guardarYEnviarRequest(payload)
+              }}
+            />
+          )}
+
+          {!loading && !request && (
+            <div className="text-sm text-muted-foreground">No hay datos del requerimiento.</div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-6 pb-5">
+          {!editing ? (
+            <>
+              <Button
+                variant="secondary" onClick={() => setEditing(true)}>Editar
+              </Button>
+              <Button variant="default" onClick={aprobar}>Aprobar</Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline" onClick={() => setEditing(false)}>"Cancelar"
+              </Button>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+
+function FPQRSDialog(
+  { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }
+){
+  const [loading, setLoading] = React.useState(false)
+  const [request, setRequest] = React.useState<any | null>(null)
+  const [editing, setEditing] = React.useState(false)
+  const [saved, setSaved] = React.useState(false)
+
+  const headerText =
+    (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ??
+    row.id_llamada ?? "—"
+
+  async function load() {
+    if (!row.id_dialvox_) return
+    setLoading(true)
+    try {
+      const res = await fetchFPQRSByDialvox(row.id_dialvox_) //fetch (por id_dialvox)
+      setRequest(res)
+    } catch {
+      toast.error("No se pudo cargar el requerimiento")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function aprobar() {
+    const id = row.id_dialvox_
+    if (!id) {
+      toast.error("No hay id_dialvox_")
+      return
+    }
+    try {
+      await sendFPQRSToITSM({ id_dialvox_: String(id) }) // ← solo el ID
+      toast.success("Requerimiento aprobado y enviado a n8n")
+      onAfterChange?.()
+    } catch {
+      toast.error("Error enviando a n8n")
+    }
+  }
+
+  async function guardarYEnviarRequest(payload?: any) {
+    if (!row.id_dialvox_) return
+    try {
+      if (!payload || Object.keys(payload).length === 0) {
+        toast.error("No hay cambios para enviar")
+        return
+      }
+      const patched = await updateFPQRSByDialvox(row.id_dialvox_, payload) // ← mismo endpoint PATCH
+      setRequest(patched)
+      toast.success("Requerimiento actualizado")
+      // (opcional) enviar a n8n aquí si corresponde:
+      //await sendResquestToITSM(patched)
+      // toast.success("Enviado a n8n")
+      setSaved(true)              // si quieres mantener edición, usa saved + footer “Cerrar edición”
+      //setEditing(false)        // si prefieres cerrar edición al guardar, usa esta línea y quita saved
+      //onAfterChange?.()
+    } catch {
+      toast.error("Error al actualizar el requerimiento")
+    }
+  }
+
+  return (
+    <Dialog
+      onOpenChange={(open) => {
+        if (open && !request && !loading) load()
+        if (!open) { setEditing(false); setSaved(false) }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
+          <Badge variant="outline" className="px-1.5 text-muted-foreground">
+            FPQRS
+          </Badge>
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-3xl p-0">
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
+          <DialogHeader>
+            <DialogTitle>FPQRS · {headerText}</DialogTitle>
+            <DialogClose asChild>
+              <button
+                className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                aria-label="Cerrar"
+              >
+                <IconX className="h-5 w-5" />
+              </button>
+            </DialogClose>
+          </DialogHeader>
+        </div>
+
+        <div className="max-h-[78vh] overflow-y-auto px-6 py-5">
+          {loading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+
+          {!loading && request && (
+            <FormRequerimiento
+              item={request}
+              readOnly={!editing}
+              hideSubmit={false}
+              onSubmit={async (payload) => {
+                await guardarYEnviarRequest(payload)
+              }}
+            />
+          )}
+
+          {!loading && !request && (
+            <div className="text-sm text-muted-foreground">No hay datos del fpqrs.</div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-6 pb-5">
+          {!editing ? (
+            <>
+              <Button
+                variant="secondary" onClick={() => setEditing(true)}>Editar
+              </Button>
+              <Button variant="default" onClick={aprobar}>Aprobar</Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline" onClick={() => setEditing(false)}>Cancelar
+              </Button>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 
 // ============================
 // Chat parsing & UI
@@ -841,56 +1106,18 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
           return <IncidentDialog row={row.original} onAfterChange={refetch} />
         }
 
-        const isLargeForm = norm === "Requerimiento"
+        if (norm === "Requerimiento") {
+          return <RequestDialog row={row.original} onAfterChange={refetch} />
+        }
+
+        if (norm === "fpqrs") {
+          return <FPQRSDialog row={row.original} onAfterChange={refetch} />
+        }
 
         return (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
-                <Badge variant="outline" className="px-1.5 text-muted-foreground">
-                  {label}
-                </Badge>
-              </Button>
-            </DialogTrigger>
-
-            {norm === "none" ? (
-              <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Tipo de solicitud</DialogTitle>
-                </DialogHeader>
-                <TipoSolicitudModalFallback item={row.original} />
-              </DialogContent>
-            ) : isLargeForm ? (
-              <DialogContent className="sm:max-w-3xl p-0">
-                <DialogHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4">
-                  <DialogTitle>{norm}</DialogTitle>
-                </DialogHeader>
-                <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
-                  <CaseFormRouter
-                    item={rowToCaseItem(row.original)}
-                    onSubmit={(payload) => {
-                      console.log("payload form:", payload)
-                      toast.success("Formulario capturado")
-                    }}
-                  />
-                </div>
-              </DialogContent>
-            ) : (
-              <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>{norm}</DialogTitle>
-                </DialogHeader>
-                <CaseFormRouter
-                  item={rowToCaseItem(row.original)}
-                  onSubmit={(payload) => {
-                    console.log("payload form:", payload)
-                    toast.success("Formulario capturado")
-                  }}
-                />
-              </DialogContent>
-            )}
-          </Dialog>
+          <Badge variant="outline" className="px-1.5 text-muted-foreground"> — </Badge>
         )
+
       },
     },
 

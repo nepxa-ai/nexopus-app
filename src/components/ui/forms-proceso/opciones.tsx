@@ -258,10 +258,14 @@ export const opcionesITSM = {
   impacto: ["Bajo", "Medio", "Alto"],
 }
 
-export const opcionesRequerimiento = {
-  servicio: ["Configuraciones NGFW", "Soporte NGFW", "Altas/Bajas"],
-  estado: ["Abierto", "Cerrado"],
-  urgencia: ["Bajo", "Medio", "Alto"],
+export const opcionesITSM_fpqrs = {
+   servicio: [
+    "Seleccionar",
+    "FPQRS",
+  ],
+  categoria: [" "],
+  subcategoria: [" "]
+
 }
 
 export const opcionesGenerales = {

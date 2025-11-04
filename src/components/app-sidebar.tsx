@@ -9,6 +9,7 @@ import {
   IconUsers,
   IconDatabase,
   IconReport,
+  IconLibrary,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -84,13 +85,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Bloque visible sólo para admins */}
         {role === "admin" && (
           <SidebarGroup>
-            <SidebarGroupLabel>Equipo Gestores</SidebarGroupLabel>
+            <SidebarGroupLabel>Adminstración</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link href="/admin">
                     <IconUsers className="size-4" />
                     <span>Administrar usuarios</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/catalog">
+                    <IconLibrary className="size-4" />
+                    <span>Administrar catalogo (Servicios, Categoria, Subcategoria)</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

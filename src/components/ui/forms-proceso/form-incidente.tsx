@@ -21,7 +21,7 @@ type Props = {
   hideSubmit?: boolean        // oculta botón interno
 }
 
-/** Helpers de normalización */
+/** ===== Helpers de normalización ===== */
 const toTitle = (s?: string | null) =>
   (s ?? "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())
 
@@ -133,7 +133,7 @@ function buildPatchPayload(item: any, v: ReturnType<typeof deriveLocalStateFromI
    // },
   }
 
-  console.log("PATCH payload ->", payload)
+  console.log("PATCH payload incidente->", payload)
 
   return payload
 
@@ -169,7 +169,8 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
           } finally {
             setSaving(false)
           }
-        }}
+        }
+        }
       >
       {/* ==================== INFORMACIÓN CLIENTE ==================== */}
       <h3 className="font-semibold">Información Cliente</h3>
@@ -236,9 +237,7 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
           <Select value={v.categoria} onValueChange={(x) => setV((s) => ({ ...s, categoria: x }))} disabled={disabled}>
             <SelectTrigger><SelectValue placeholder="Categoría" /></SelectTrigger>
             <SelectContent>
-              {opcionesITSM.categoria.map((x) => (
-                <SelectItem key={x} value={x}>{x}</SelectItem>
-              ))}
+              {opcionesITSM.categoria.map((x) => (<SelectItem key={x} value={x}>{x}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
@@ -248,9 +247,7 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
           <Select value={v.subcategoria} onValueChange={(x) => setV((s) => ({ ...s, subcategoria: x }))} disabled={disabled}>
             <SelectTrigger><SelectValue placeholder="Subcategoría" /></SelectTrigger>
             <SelectContent>
-              {opcionesITSM.subcategoria.map((x) => (
-                <SelectItem key={x} value={x}>{x}</SelectItem>
-              ))}
+              {opcionesITSM.subcategoria.map((x) => (<SelectItem key={x} value={x}>{x}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
