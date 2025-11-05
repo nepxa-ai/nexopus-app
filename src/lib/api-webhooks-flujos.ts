@@ -1,48 +1,49 @@
-// src/lib/api-webhooks-flujo.ts
+// src/lib/api-webhooks-flujos.ts
+
 export type FinLlamadaItem = {
   uniqueid: string;
   dialvox_id: string;
   tipo_solicitud: "incidente" | "requerimiento" | "consulta" | "fpqrs";
 };
 
-export async function sendFinLlamadaGestor(
+// --- Opción A: llamada DIRECTA al webhook interno ---
+export async function postFinLlamadaDirect(
   items: FinLlamadaItem[],
-  opts?: { signal?: AbortSignal }
+  timeoutMs = 10000
 ) {
-  const res = await fetch("https://10.34.7.10:5678/webhook/fin-llamada-gestor", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(items),
-    signal: opts?.signal,
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Webhook fin-llamada HTTP ${res.status} ${text || ""}`.trim());
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort("timeout"), timeoutMs);
+  try {
+    const res = await fetch("https://10.34.7.10:5678/webhook/fin-llamada-gestor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(items),
+      signal: ac.signal,
+    });
+    if (!res.ok) throw new Error(`fin-llamada HTTP ${res.status}`);
+    try { return await res.json(); } catch { return {}; }
+  } finally {
+    clearTimeout(t);
   }
-
-  // El webhook podría no retornar JSON; si falla el parseo, regresamos {}.
-  try { return await res.json(); } catch { return {}; }
 }
 
-/**
- * Alternativa recomendada si hay CORS/SSL interno:
- * Crea un endpoint backend (ej. /api/forward/fin-llamada-gestor) 
- * y reenvía allí el POST, para evitar CORS y certificados self-signed.
- */
-export async function sendFinLlamadaGestorViaApi(
+// --- Opción B: llamada VÍA PROXY de tu backend ---
+export async function postFinLlamadaViaApi(
   items: FinLlamadaItem[],
-  opts?: { signal?: AbortSignal }
+  timeoutMs = 10000
 ) {
-  const res = await fetch("/api/forward/fin-llamada-gestor", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(items),
-    signal: opts?.signal,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Forward fin-llamada HTTP ${res.status} ${text || ""}`.trim());
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort("timeout"), timeoutMs);
+  try {
+    const res = await fetch("/api/forward/fin-llamada-gestor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(items),
+      signal: ac.signal,
+    });
+    if (!res.ok) throw new Error(`forward fin-llamada HTTP ${res.status}`);
+    try { return await res.json(); } catch { return {}; }
+  } finally {
+    clearTimeout(t);
   }
-  try { return await res.json(); } catch { return {}; }
 }

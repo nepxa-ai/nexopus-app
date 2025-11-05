@@ -91,8 +91,9 @@ import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
 import { fetchUserByExtensionLite } from "@/lib/api-users"
 import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
 import { fetchRequestByDialvox, updateRequestByDialvox, sendRequestToITSM } from "@/lib/api-requirements"
-import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRStToITSM } from "@/lib/api-fpqrs"
-
+//import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRStToITSM } from "@/lib/api-fpqrs"
+import { fetchFPQRSByDialvox, updateFPQRSByDialvox} from "@/lib/api-fpqrs"
+import { postFinLlamadaViaApi, postFinLlamadaDirect } from "@/lib/api-webhooks-flujos";
 
 import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
 import FormRequerimiento from "@/components/ui/forms-proceso/form-requerimiento"
@@ -1017,54 +1018,64 @@ function GestorCell({ ext }: { ext: number | null }) {
 }
 
 
-// === Componente para la celda Finalizar ===
-function toTipoSolicitudApi(raw?: string | null): "incidente" | "requerimiento" | "consulta" | "fpqrs" | null {
-  const norm = normalizeTipoSolicitudRaw(raw);
-  if (norm === "Incidente") return "incidente";
-  if (norm === "Requerimiento") return "requerimiento";
-  if (norm === "Consulta de caso") return "consulta";
-  if (norm === "fpqrs") return "fpqrs";
+// Debe retornar uno de los 4 valores válidos para el API
+function normalizarTipoSolicitud(t?: string | null) {
+  const s = (t ?? "").toLowerCase();
+  if (s.includes("inc")) return "incidente" as const;
+  if (s.includes("req")) return "requerimiento" as const;
+  if (s.includes("consult")) return "consulta" as const;
+  if (s.includes("fpqrs")) return "fpqrs" as const;
   return null;
 }
 
-function FinalizarCellButton({ item, onDone }: { item: RowType; onDone?: () => void }) {
+export function FinalizarCellButton({
+  row,
+  useProxy = true, // si tienes /api/forward/..., déjalo true
+}: {
+  row: any;
+  useProxy?: boolean;
+}) {
   const [loading, setLoading] = React.useState(false);
 
-  async function handleClick() {
+  async function onClick() {
+    // Construimos el payload desde la fila
+    const uniqueid = row?.id_llamada != null ? String(row.id_llamada) : null;
+    const dialvox  = row?.id_dialvox_ != null ? String(row.id_dialvox_) : null;
+    const tipo     = normalizarTipoSolicitud(row?.tipo_solicitud);
+
+    if (!uniqueid || !dialvox || !tipo) {
+      toast.error("Faltan datos (uniqueid, dialvox_id o tipo_solicitud).");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const uniqueid = item.id_llamada ? String(item.id_llamada) : null;
-      const dialvox = item.id_dialvox_ != null ? String(item.id_dialvox_) : null;
-      const tipo = toTipoSolicitudApi(item.tipo_solicitud);
-
-      if (!uniqueid || !dialvox || !tipo) {
-        toast.error("Faltan datos para finalizar (uniqueid, dialvox_id o tipo_solicitud).");
-        return;
+      const payload = [{ uniqueid, dialvox_id: dialvox, tipo_solicitud: tipo }];
+      if (useProxy) {
+        await postFinLlamadaDirect(payload, 10000);
+      } else {
+        await postFinLlamadaDirect(payload, 10000);
       }
-
-      setLoading(true);
-      // Si tienes proxy backend, usa sendFinLlamadaGestorViaApi(...)
-      const { sendFinLlamadaGestor } = await import("@/lib/api-webhooks-flujo");
-      await sendFinLlamadaGestor([
-        { uniqueid, dialvox_id: dialvox, tipo_solicitud: tipo },
-      ]);
-
-      toast.success("Webhook de finalización enviado");
-      onDone?.();
+      toast.success("Webhook fin-llamada enviado");
     } catch (e: any) {
-      toast.error(e?.message || "No se pudo llamar el webhook");
+      toast.error(e?.message ?? "Error llamando al webhook");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button size="sm" variant="secondary" onClick={handleClick} disabled={loading}>
+    <Button
+      type="button"
+      size="sm"
+      variant="secondary"
+      onClick={onClick}
+      disabled={loading}  // activo al cargar, solo se desactiva durante el envío
+    >
       {loading ? "Enviando…" : "Finalizar"}
     </Button>
   );
 }
-
-
 
 
 // ============================
@@ -1108,21 +1119,13 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
       enableSorting: false,
     },
 
-    // 1.5) Finalizar atención (después de "Id atención")
+    //1.5 boton finalizar 
     {
       id: "finalizar",
       header: "Finalizar",
       enableSorting: false,
       enableHiding: false,
-      cell: ({ row }) => {
-        const item = row.original as RowType;
-        return (
-          <FinalizarCellButton
-            item={item}
-            onDone={async () => { await refetch(); }}
-          />
-        );
-      },
+      cell: ({ row }) => <FinalizarCellButton row={row.original} useProxy={true} />,
     },
 
     // 2) Tipo de solicitud
