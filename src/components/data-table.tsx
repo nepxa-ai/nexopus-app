@@ -1016,6 +1016,57 @@ function GestorCell({ ext }: { ext: number | null }) {
   )
 }
 
+
+// === Componente para la celda Finalizar ===
+function toTipoSolicitudApi(raw?: string | null): "incidente" | "requerimiento" | "consulta" | "fpqrs" | null {
+  const norm = normalizeTipoSolicitudRaw(raw);
+  if (norm === "Incidente") return "incidente";
+  if (norm === "Requerimiento") return "requerimiento";
+  if (norm === "Consulta de caso") return "consulta";
+  if (norm === "fpqrs") return "fpqrs";
+  return null;
+}
+
+function FinalizarCellButton({ item, onDone }: { item: RowType; onDone?: () => void }) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleClick() {
+    try {
+      const uniqueid = item.id_llamada ? String(item.id_llamada) : null;
+      const dialvox = item.id_dialvox_ != null ? String(item.id_dialvox_) : null;
+      const tipo = toTipoSolicitudApi(item.tipo_solicitud);
+
+      if (!uniqueid || !dialvox || !tipo) {
+        toast.error("Faltan datos para finalizar (uniqueid, dialvox_id o tipo_solicitud).");
+        return;
+      }
+
+      setLoading(true);
+      // Si tienes proxy backend, usa sendFinLlamadaGestorViaApi(...)
+      const { sendFinLlamadaGestor } = await import("@/lib/api-webhooks-flujo");
+      await sendFinLlamadaGestor([
+        { uniqueid, dialvox_id: dialvox, tipo_solicitud: tipo },
+      ]);
+
+      toast.success("Webhook de finalización enviado");
+      onDone?.();
+    } catch (e: any) {
+      toast.error(e?.message || "No se pudo llamar el webhook");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button size="sm" variant="secondary" onClick={handleClick} disabled={loading}>
+      {loading ? "Enviando…" : "Finalizar"}
+    </Button>
+  );
+}
+
+
+
+
 // ============================
 // Columnas
 // ============================
@@ -1064,32 +1115,13 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => {
-        const item = row.original as RowType
-
+        const item = row.original as RowType;
         return (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={async () => {
-              try {
-                if (!item?.id) {
-                  toast.error("No se encontró el ID del webhook")
-                  return
-                }
-
-                // Ajusta el nombre del campo según tu backend: estado_caso o estado
-                await updateWebhookById(item.id, { estado_caso: "Por revisar" })
-
-                toast.success("Atención marcada como 'Por revisar'")
-                await refetch() // recarga la tabla
-              } catch {
-                toast.error("No se pudo actualizar el estado")
-              }
-            }}
-          >
-            Finalizar
-          </Button>
-        )
+          <FinalizarCellButton
+            item={item}
+            onDone={async () => { await refetch(); }}
+          />
+        );
       },
     },
 
