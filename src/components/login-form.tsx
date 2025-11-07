@@ -9,34 +9,55 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { apiLogin, fetchMe } from "@/lib/api";
+import { recuperarContrasena } from "@/lib/api-recuperacion";
 
 import Image from "next/image";
-
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const [email, setEmail] = React.useState<string>("");
   const [password, setPass] = React.useState<string>("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  
+
+  const [recoverLoading, setRecoverLoading] = React.useState(false);
+  const [recoverMsg, setRecoverMsg] = React.useState<string | null>(null);
+
   const router = useRouter();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setRecoverMsg(null);
     setLoading(true);
     try {
-
       const { access_token } = await apiLogin({ username: email, password });
       localStorage.setItem("access_token", access_token);
       await fetchMe(access_token);
       router.push("/dashboard");
-    } 
-    catch (err: any) {
+    } catch (err: any) {
       setError(err?.message || "Error de autenticación");
-    } 
-    finally {
+    } finally {
       setLoading(false);
+    }
+  }
+
+  async function onForgot() {
+    setError(null);
+    setRecoverMsg(null);
+
+    if (!email) {
+      setError("Ingresa tu email y luego haz clic en '¿Olvidó su contraseña?'");
+      return;
+    }
+
+    setRecoverLoading(true);
+    try {
+      const res = await recuperarContrasena(email.trim());
+      setRecoverMsg(res.message || "Si el correo existe, se enviaron instrucciones.");
+    } catch (err: any) {
+      setError(err?.message || "No se pudo iniciar la recuperación.");
+    } finally {
+      setRecoverLoading(false);
     }
   }
 
@@ -47,27 +68,22 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           {/* Columna izquierda */}
           <form onSubmit={onSubmit} className="p-6 md:p-8 flex flex-col gap-6">
             <div className="flex flex-col items-center text-center">
-              {/* Logo pequeño encima del título */}
               <Image
-                src="/images/logo-completo-nexopus-pulpo-color.png"   // imagen en public/images/
+                src="/images/logo-completo-nexopus-pulpo-color.png"
                 alt="Logo Nexopus"
-                width={320}   // tamaño pequeño
+                width={320}
                 height={240}
                 className="object-contain"
                 priority
               />
               <h1 className="text-2xl font-bold">Platform</h1>
-              {/*}
-              <p className="text-balance text-muted-foreground">
-                Ingresa tu email para acceder
-              </p> */}
             </div>
 
             <div className="grid gap-3">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                type="text"
+                type="email"
                 placeholder="email"
                 required
                 value={email}
@@ -77,15 +93,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             </div>
 
             <div className="grid gap-3">
-              <div className="flex items-center">
-                <Label htmlFor="password">Contraseña</Label>
-                <a
-                  href="#"
-                  className="ml-auto text-sm underline-offset-2 hover:underline"
+              <div className="flex items-center gap-3 w-full">
+                <Label htmlFor="password" className="mr-auto">Contraseña</Label>
+
+                <Button
+                  type="button"
+                  variant="link"
+                  className="ml-auto p-0 h-auto text-sm underline-offset-2"
+                  onClick={onForgot}
+                  disabled={recoverLoading || loading}
                 >
-                  ¿Olvidó su contraseña?
-                </a>
+                  {recoverLoading ? "Enviando..." : "¿Olvidó su contraseña?"}
+                </Button>
               </div>
+
               <Input
                 id="password"
                 type="password"
@@ -101,18 +122,23 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 {error}
               </p>
             )}
+            {recoverMsg && !error && (
+              <p className="text-sm text-green-700" role="status">
+                {recoverMsg}
+              </p>
+            )}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Ingresando..." : "Login"}
             </Button>
           </form>
 
-          {/* Columna derecha con logo centrado (sin fill) */}
+          {/* Columna derecha con logo centrado */}
           <div className="hidden md:flex items-center justify-center bg-muted p-8">
             <Image
-              src="/images/logo-open-group-small.png" // imagen en public/images/
+              src="/images/logo-open-group-small.png"
               alt="Logo Open Group"
-              width={320}              // ajuste del 
+              width={320}
               height={320}
               priority
               className="object-contain h-auto w-auto max-h-[360px] max-w-[80%]"
@@ -121,7 +147,24 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         </CardContent>
       </Card>
 
-
+      <div className="flex items-center justify-center gap-2 py-3 border-t text-sm text-muted-foreground">
+        <span>Desarrollado por</span>
+        <a
+          href="https://nepxa.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 font-medium hover:underline text-primary"
+        >
+          <Image
+            src="/images/logo-nepxa-mini.png"
+            alt="Logo Nepxa"
+            width={18}
+            height={18}
+            className="object-contain opacity-90 hover:opacity-100 transition"
+          />
+          <span>Nepxa</span>
+        </a>
+      </div>
     </div>
   );
 }

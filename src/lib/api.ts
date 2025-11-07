@@ -1,6 +1,5 @@
 // lib/api.ts
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "/api";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export async function apiLogin(data: { username: string; password: string }) {
   const body = new URLSearchParams();
