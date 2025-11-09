@@ -155,14 +155,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           rel="noopener noreferrer"
           className="flex items-center gap-1 font-medium hover:underline text-primary"
         >
-          <Image
-            src="/images/logo-nepxa-mini.png"
-            alt="Logo Nepxa"
-            width={18}
-            height={18}
-            className="object-contain opacity-90 hover:opacity-100 transition"
-          />
-          <span>Nepxa</span>
+        <Image
+           src="/images/logotipo-nepxa-horizontal-letra-oscura.png"
+           alt="Logo Nepxa"
+           width={120}
+           height={120}
+           className="object-contain opacity-90 hover:opacity-100 transition"
+         />
         </a>
       </div>
     </div>
