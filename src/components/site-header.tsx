@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { IconBook } from "@tabler/icons-react"   // 👈 Importa el icono
 
 export function SiteHeader() {
   return (
@@ -14,15 +15,14 @@ export function SiteHeader() {
         <h1 className="text-base font-medium">Dashboard</h1>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-            {/*"https://github.com/shadcn-ui/ui/tree/main/apps/v4/app/(examples)/dashboard"*/}
             <a
-              
-              href="https://www.opengroupsa.com/"
+              href="https://github.com/nepxa-ai/Nexopus-OG-Creacion-Automatica-Ivanti-docs"
               rel="noopener noreferrer"
               target="_blank"
-              className="dark:text-foreground"
+              className="flex items-center gap-1 dark:text-foreground"
             >
-              Open Group
+              <IconBook size={18} stroke={1.5} /> {}
+              Documentación
             </a>
           </Button>
         </div>

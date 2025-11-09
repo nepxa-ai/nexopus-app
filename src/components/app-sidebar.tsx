@@ -10,6 +10,7 @@ import {
   IconDatabase,
   IconReport,
   IconLibrary,
+  IconBook,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -53,8 +54,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Menú principal — ¡Dashboard ahora va a /dashboard!
   const navMain = [
     { title: "Dashboard",         url: "/dashboard", icon: IconDashboard },
-    { title: "Automatización AI", url: "#",          icon: IconUsers },
-    { title: "Analítica",         url: "#",          icon: IconChartBar },
   ]
 
   //const documents = [
