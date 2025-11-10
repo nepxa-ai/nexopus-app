@@ -92,7 +92,7 @@ import { fetchUserByExtensionLite } from "@/lib/api-users"
 import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
 import { fetchRequestByDialvox, updateRequestByDialvox, sendRequestToITSM } from "@/lib/api-requirements"
 //import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRStToITSM } from "@/lib/api-fpqrs"
-import { fetchFPQRSByDialvox, updateFPQRSByDialvox} from "@/lib/api-fpqrs"
+import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRSToITSM} from "@/lib/api-fpqrs"
 import { postFinLlamadaViaApi, postFinLlamadaDirect } from "@/lib/api-webhooks-flujos";
 
 import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
