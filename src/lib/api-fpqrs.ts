@@ -26,7 +26,7 @@ export async function updateFPQRSByDialvox(id_dvx: number | string, data: any) {
 }
 
 export async function sendFPQRSToITSM(data: any) {
-  const r = await fetch(`/webhook/crear-incidente-itsm`, {
+  const r = await fetch(`https://10.34.7.10:5678/n8n/webhook/crear-fpqrs-ivanti`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
