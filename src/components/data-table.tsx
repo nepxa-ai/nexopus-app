@@ -91,7 +91,6 @@ import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
 import { fetchUserByExtensionLite } from "@/lib/api-users"
 import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
 import { fetchRequestByDialvox, updateRequestByDialvox, sendRequestToITSM } from "@/lib/api-requirements"
-//import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRStToITSM } from "@/lib/api-fpqrs"
 import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRSToITSM} from "@/lib/api-fpqrs"
 import { postFinLlamadaViaApi, postFinLlamadaDirect } from "@/lib/api-webhooks-flujos";
 
@@ -678,7 +677,7 @@ function FPQRSDialog(
       const res = await fetchFPQRSByDialvox(row.id_dialvox_) //fetch (por id_dialvox)
       setRequest(res)
     } catch {
-      toast.error("No se pudo cargar el requerimiento")
+      toast.error("No se pudo cargar el fpqrs")
     } finally {
       setLoading(false)
     }
@@ -692,7 +691,7 @@ function FPQRSDialog(
     }
     try {
       await sendFPQRSToITSM({ id_dialvox_: String(id) }) // ← solo el ID
-      toast.success("Requerimiento aprobado y enviado a n8n")
+      toast.success("FPQRS aprobado y enviado a n8n")
       onAfterChange?.()
     } catch {
       toast.error("Error enviando a n8n")
@@ -708,7 +707,7 @@ function FPQRSDialog(
       }
       const patched = await updateFPQRSByDialvox(row.id_dialvox_, payload) // ← mismo endpoint PATCH
       setRequest(patched)
-      toast.success("Requerimiento actualizado")
+      toast.success("FPQRS actualizado")
       // (opcional) enviar a n8n aquí si corresponde:
       //await sendResquestToITSM(patched)
       // toast.success("Enviado a n8n")
@@ -1068,11 +1067,11 @@ export function FinalizarCellButton({
     <Button
       type="button"
       size="sm"
-      variant="secondary"
+      variant="default"
       onClick={onClick}
       disabled={loading}  // activo al cargar, solo se desactiva durante el envío
     >
-      {loading ? "Enviando…" : "Finalizar"}
+      {loading ? "Enviando…" : "Post-procesar"}
     </Button>
   );
 }
@@ -1121,8 +1120,8 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
 
     //1.5 boton finalizar 
     {
-      id: "finalizar",
-      header: "Finalizar",
+      id: "post-procesar",
+      header: "Post-rocesar",
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => <FinalizarCellButton row={row.original} useProxy={true} />,

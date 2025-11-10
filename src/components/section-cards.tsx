@@ -48,11 +48,11 @@ export function SectionCards() {
             {totalAll ?? "—"}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
+            {/* <Badge variant="outline">
               <IconTrendingUp />
-              {/* opcional: % variación mensual si luego lo calculas */}
+               opcional: % variación mensual si luego lo calculas
               +12.5%
-            </Badge>
+            </Badge>  */}
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm" />
@@ -66,11 +66,12 @@ export function SectionCards() {
             {totalToday ?? "—"}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
+            {/*
+             <Badge variant="outline">
               <IconTrendingDown />
-              {/* opcional: % vs. ayer si luego lo calculas */}
+               opcional: % vs. ayer si luego lo calculas
               -11.67%
-            </Badge>
+            </Badge> */}
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm" />
@@ -84,15 +85,16 @@ export function SectionCards() {
             3
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
+            {/* <Badge variant="outline">
               <IconTrendingUp />
               +3.5%
-            </Badge>
+            </Badge> */}
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm" />
       </Card>
 
+      {/* Card 2: Total del día 
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Tiempo Promedio llamada?</CardDescription>
@@ -109,7 +111,7 @@ export function SectionCards() {
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm" />
-      </Card>
+      </Card> */}
     </div>
   )
 }
