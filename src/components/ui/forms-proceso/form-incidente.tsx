@@ -173,18 +173,19 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
         }
       >
       {/* ==================== INFORMACIÓN CLIENTE ==================== */}
-      <h3 className="font-semibold">Información Cliente</h3>
+      <h3 className = "font-semibold">Información Cliente</h3>
 
       <div className="grid gap-4 md:grid-cols-1">
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Contacto</Label>
           <Input disabled={disabled} value={v.contacto} onChange={(e) => setV((s) => ({ ...s, contacto: e.target.value }))} />
         </div>
-
+        
+        {/*
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Teléfono</Label>
           <Input disabled={disabled} value={v.telefono} onChange={(e) => setV((s) => ({ ...s, telefono: e.target.value }))} />
-        </div>
+        </div> */}
 
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Correo</Label>
@@ -193,33 +194,41 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="flex items-center gap-3">
-          <Label className="text-xs text-muted-foreground">VIP</Label>
-          <Switch disabled={disabled} checked={v.vip} onCheckedChange={(chk) => setV((s) => ({ ...s, vip: chk }))} />
-        </div>
 
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Organización</Label>
           <Input disabled={disabled} value={v.organizacion} onChange={(e) => setV((s) => ({ ...s, organizacion: e.target.value }))} />
         </div>
 
+        <div className="flex items-center gap-3">
+          <Label className="text-xs text-muted-foreground">VIP</Label>
+          <Switch disabled={disabled} checked={v.vip} onCheckedChange={(chk) => setV((s) => ({ ...s, vip: chk }))} />
+        </div>
+
+
+        
+        {/*
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">NIT</Label>
           <Input disabled={disabled} value={v.nit} onChange={(e) => setV((s) => ({ ...s, nit: e.target.value }))} />
         </div>
+        */}
       </div>
-
+      
+      {/*
       <div className="flex flex-col gap-2">
         <Label className="text-xs text-muted-foreground">Dirección</Label>
         <Input disabled={disabled} value={v.direccion} onChange={(e) => setV((s) => ({ ...s, direccion: e.target.value }))} />
-      </div>
+      </div> */}
 
       <Separator />
 
       {/* ==================== INFORMACIÓN SERVICIO ==================== */}
       <h3 className="font-semibold">Información Servicio</h3>
-
+    
+      {/*Grupo de Servicio - Categoria - Subcategoria */}
       <div className="grid gap-4 md:grid-cols-2">
+
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Servicio</Label>
           <Select value={v.servicio} onValueChange={(x) => setV((s) => ({ ...s, servicio: x }))} disabled={disabled}>
@@ -251,12 +260,20 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
             </SelectContent>
           </Select>
         </div>
-      </div>
 
+      </div>
+      {/*Grupo de Servicio - Categoria - Subcategoria */}        
+      
+      {/*Grupo de Detalle - Estado */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Detalle</Label>
           <Input disabled={disabled} value={v.detalle} onChange={(e) => setV((s) => ({ ...s, detalle: e.target.value }))} />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs text-muted-foreground">Prioridad</Label>
+          <Input disabled={disabled} value={v.prioridad} onChange={(e) => setV((s) => ({ ...s, prioridad: e.target.value }))} />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -271,6 +288,9 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
           </Select>
         </div>
 
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Equipo</Label>
           <Select value={v.equipo} onValueChange={(x) => setV((s) => ({ ...s, equipo: x }))} disabled={disabled}>
@@ -282,14 +302,13 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Propietario</Label>
           <Input disabled={disabled} value={v.propietario} onChange={(e) => setV((s) => ({ ...s, propietario: e.target.value }))} />
         </div>
-
+        
+        {/*
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Urgencia</Label>
           <Select value={v.urgencia} onValueChange={(x) => setV((s) => ({ ...s, urgencia: x }))} disabled={disabled}>
@@ -313,18 +332,7 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">Prioridad</Label>
-          <Input disabled={disabled} value={v.prioridad} onChange={(e) => setV((s) => ({ ...s, prioridad: e.target.value }))} />
-        </div>
-
-        <div className="md:col-span-2 flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">Resumen</Label>
-          <Input disabled={disabled} value={v.resumen} onChange={(e) => setV((s) => ({ ...s, resumen: e.target.value }))} />
-        </div>
+        */}
       </div>
 
       <Separator />
@@ -333,6 +341,12 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
       <h3 className="font-semibold">Información Incidente</h3>
 
       <div className="flex flex-col gap-2">
+
+        <div className="md:col-span-2 flex flex-col gap-2">
+          <Label className="text-xs text-muted-foreground">Resumen</Label>
+          <Input disabled={disabled} value={v.resumen} onChange={(e) => setV((s) => ({ ...s, resumen: e.target.value }))} />
+        </div>
+
         <Label className="text-xs text-muted-foreground">Descripción</Label>
         <Textarea
           disabled={disabled}

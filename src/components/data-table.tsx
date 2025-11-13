@@ -389,77 +389,77 @@ function IdAtencionCell({ item }: { item: RowType }) {
   )
 }
 
-function IncidentDialog(
-  { row, onAfterChange,}:{row: RowType 
-    onAfterChange?: () => void}) {
-    const [loading, setLoading] = React.useState(false)
-    const [incident, setIncident] = React.useState<any | null>(null)
-    const [editing, setEditing] = React.useState(false)
-    const [saved, setSaved] = React.useState(false)
+function IncidentDialog({ row, onAfterChange }: { row: RowType; onAfterChange?: () => void }){
+  const [loading, setLoading] = React.useState(false)
+  const [incident, setIncident] = React.useState<any | null>(null)
+  const [editing, setEditing] = React.useState(false)
+  const [saved, setSaved] = React.useState(false)
+  const [ticket, setTicket] = React.useState<string | null>(null) // ← Nuevo estado
 
-    const headerText = (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ?? row.id_llamada ?? "—"
+  const headerText = (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ?? row.id_llamada ?? "—"
 
-    async function load() {
-      if (!row.id_dialvox_) return
-      
-      setLoading(true)
-      try {
-        const res = await fetchIncidentByDialvox(row.id_dialvox_)
-        setIncident(res)
-      } 
-      catch {
-        toast.error("No se pudo cargar el incidente")
-      } 
-      finally {
-        setLoading(false)
-      }
+  async function load() {
+    if (!row.id_dialvox_) return
+    setLoading(true)
+    try {
+      const res = await fetchIncidentByDialvox(row.id_dialvox_)
+      setIncident(res)
+      // si ya existe ticket en DB lo mostramos
+      if (res.ticket || res.ticket_number) setTicket(res.ticket || res.ticket_number)
+    } catch {
+      toast.error("No se pudo cargar el incidente")
+    } finally {
+      setLoading(false)
     }
+  }
 
   async function aprobar() {
     const id = row.id_dialvox_
     if (!id) {
-      toast.error("No hay id_dialvox_")
+      toast.error("No hay id_dialvox")
       return
     }
     try {
-      await sendIncidentToITSM({ id_dialvox_: String(id) })    // ← solo el ID
+      const response = await sendIncidentToITSM({ id_dialvox_: String(id) })
+      // Guarda el ticket si la API lo devuelve
+      if (response.ticket || response.ticket_number)
+        setTicket(response.ticket || response.ticket_number)
       toast.success("Incidente aprobado y enviado a n8n")
-      onAfterChange?.()          // refresca DataTable si lo usas
+      onAfterChange?.()
     } catch {
       toast.error("Error enviando a n8n")
     }
   }
 
-
   async function guardarYEnviar(payload?: any) {
-  if (!row.id_dialvox_) return
-  try {
-    if (!payload || Object.keys(payload).length === 0) {
-      toast.error("No hay cambios para enviar")
-      return
+    if (!row.id_dialvox_) return
+    try {
+      if (!payload || Object.keys(payload).length === 0) {
+        toast.error("No hay cambios para enviar")
+        return
+      }
+      const patched = await updateIncidentByDialvox(row.id_dialvox_, payload)
+      setIncident(patched)
+      toast.success("Incidente actualizado")
+
+      //const response = await sendIncidentToITSM(patched)
+      //if (response.ticket || response.ticket_number)
+      //  setTicket(response.ticket || response.ticket_number)
+
+      //toast.success("Enviado a n8n")
+      //setEditing(false)
+      //onAfterChange?.()
+    } catch {
+      toast.error("Error al actualizar o enviar")
     }
-    const patched = await updateIncidentByDialvox(row.id_dialvox_, payload)
-    setIncident(patched)
-    toast.success("Incidente actualizado")
-    await sendIncidentToITSM(patched)
-    toast.success("Enviado a n8n")
-    setEditing(false)
-    onAfterChange?.()
-  }  
-  catch {
-    toast.error("Error al actualizar o enviar")
-  }
   }
 
   return (
     <Dialog
       onOpenChange={(open) => {
         if (open && !incident && !loading) load()
-        if (!open) {
-          setEditing(false)
-          setSaved(false)
-        }
-      }}
+        if (!open) { setEditing(false);setSaved(false) }
+      }} 
     >
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="h-7 px-2 rounded-full">
@@ -470,73 +470,85 @@ function IncidentDialog(
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-3xl p-0">
+        {/* Cabecera */}
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
           <DialogHeader>
-            <DialogTitle>Incidente · {headerText}</DialogTitle>
-            
-            {/* Botón de cierre (X) */}
+            <DialogTitle>
+              Incidente · {headerText}
+              {ticket && (
+                <span className="ml-3 text-lg text-blue-600 font-semibold">
+                  Ticket: {ticket}
+                </span>
+              )}
+            </DialogTitle>
+
             <DialogClose asChild>
               <button
-                className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                className="absolute top-2 right-2 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
                 aria-label="Cerrar"
               >
-                <IconX className="h-5 w-5" />
+              <IconX className="h-8 w-8" color="gray" />
               </button>
             </DialogClose>
           </DialogHeader>
         </div>
 
+        {/* Contenido */}
         <div className="max-h-[78vh] overflow-y-auto px-6 py-5">
           {loading && <p className="text-sm text-muted-foreground">Cargando…</p>}
 
-          {!loading && incident && 
-          (<FormIncidente
+          {!loading && incident && (
+            <FormIncidente
               item={incident}
               readOnly={!editing}
-              hideSubmit={false}               // ← muestra el botón interno del form
-              onSubmit={async (payload) => {  // ← usa SIEMPRE el payload del form
+              hideSubmit={false}
+              onSubmit={async (payload) => {
                 await guardarYEnviar(payload)
               }}
             />
           )}
 
           {!loading && !incident && (
-            <div className="text-sm text-muted-foreground">No hay datos del incidente.</div>
+            <div className="text-sm text-muted-foreground">
+              No hay datos del incidente.
+            </div>
           )}
         </div>
-        
+
+        {/* Acciones */}
         <div className="flex items-center justify-end gap-2 px-6 pb-5">
           {!editing ? (
             <>
-              <Button variant="secondary" onClick={() => setEditing(true)}>Editar</Button>
-              <Button variant="default" onClick={aprobar}>Aprobar</Button>
+              <Button variant="secondary" onClick={() => setEditing(true)}>
+                Editar
+              </Button>
+              <Button variant="default" onClick={aprobar}>
+                Aprobar
+              </Button>
             </>
           ) : (
             <>
-              <Button variant="outline" onClick={() => setEditing(false)}>Cancelar</Button>
-              {/*
-                <Button onClick={async () => await guardarYEnviar()}>Guardar y enviar</Button>
-              */}
+              <Button variant="outline" onClick={() => setEditing(false)}>
+                Cerrar edición
+              </Button>
             </>
           )}
         </div>
-        
       </DialogContent>
     </Dialog>
   )
 }
 
-function RequestDialog(
-  { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }
-){
+
+function RequestDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }){
   const [loading, setLoading] = React.useState(false)
   const [request, setRequest] = React.useState<any | null>(null)
   const [editing, setEditing] = React.useState(false)
   const [saved, setSaved] = React.useState(false)
+  const [ticket, setTicket] = React.useState<string | null>(null) // ← Nuevo estado
 
   const headerText =
-    (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ??
-    row.id_llamada ?? "—"
+    (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ?? row.id_llamada ?? "—"
 
   async function load() {
     if (!row.id_dialvox_) return
@@ -544,6 +556,8 @@ function RequestDialog(
     try {
       const res = await fetchRequestByDialvox(row.id_dialvox_) //fetch (por id_dialvox)
       setRequest(res)
+      // si ya existe ticket en DB lo mostramos
+      if (res.ticket || res.ticket_number) setTicket(res.ticket || res.ticket_number)
     } catch {
       toast.error("No se pudo cargar el requerimiento")
     } finally {
@@ -605,7 +619,13 @@ function RequestDialog(
       <DialogContent className="sm:max-w-3xl p-0">
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
           <DialogHeader>
-            <DialogTitle>Requerimiento · {headerText}</DialogTitle>
+            <DialogTitle>Requerimiento · {headerText} 
+              {ticket && (
+                <span className="ml-3 text-lg text-blue-600 font-semibold">
+                  Ticket: {ticket}
+                </span>
+              )}
+            </DialogTitle>
             <DialogClose asChild>
               <button
                 className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
@@ -647,7 +667,7 @@ function RequestDialog(
           ) : (
             <>
               <Button
-                variant="outline" onClick={() => setEditing(false)}>"Cancelar"
+                variant="outline" onClick={() => setEditing(false)}>Cerrar edición
               </Button>
             </>
           )}
@@ -657,14 +677,12 @@ function RequestDialog(
   )
 }
 
-
-function FPQRSDialog(
-  { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }
-){
+function FPQRSDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }){
   const [loading, setLoading] = React.useState(false)
   const [request, setRequest] = React.useState<any | null>(null)
   const [editing, setEditing] = React.useState(false)
   const [saved, setSaved] = React.useState(false)
+  const [ticket, setTicket] = React.useState<string | null>(null) // ← Nuevo estado
 
   const headerText =
     (row.id_dialvox_ != null ? String(row.id_dialvox_) : null) ??
@@ -676,6 +694,8 @@ function FPQRSDialog(
     try {
       const res = await fetchFPQRSByDialvox(row.id_dialvox_) //fetch (por id_dialvox)
       setRequest(res)
+      // si ya existe ticket en DB lo mostramos
+      if (res.ticket || res.ticket_number) setTicket(res.ticket || res.ticket_number)
     } catch {
       toast.error("No se pudo cargar el fpqrs")
     } finally {
@@ -737,7 +757,13 @@ function FPQRSDialog(
       <DialogContent className="sm:max-w-3xl p-0">
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
           <DialogHeader>
-            <DialogTitle>FPQRS · {headerText}</DialogTitle>
+            <DialogTitle>FPQRS · {headerText}
+              {ticket && (
+                <span className="ml-3 text-lg text-blue-600 font-semibold">
+                  Ticket: {ticket}
+                </span>
+              )}
+            </DialogTitle>
             <DialogClose asChild>
               <button
                 className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
@@ -779,7 +805,7 @@ function FPQRSDialog(
           ) : (
             <>
               <Button
-                variant="outline" onClick={() => setEditing(false)}>Cancelar
+                variant="outline" onClick={() => setEditing(false)}> Cerrar edición
               </Button>
             </>
           )}
@@ -1121,7 +1147,7 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
     //1.5 boton finalizar 
     {
       id: "post-procesar",
-      header: "Post-rocesar",
+      header: "Post-procesar",
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => <FinalizarCellButton row={row.original} useProxy={true} />,
