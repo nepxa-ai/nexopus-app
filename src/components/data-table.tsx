@@ -472,25 +472,34 @@ function IncidentDialog({ row, onAfterChange }: { row: RowType; onAfterChange?: 
       <DialogContent className="sm:max-w-3xl p-0">
         {/* Cabecera */}
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
-          <DialogHeader>
-            <DialogTitle>
-              Incidente · {headerText}
-              {ticket && (
-                <span className="ml-3 text-lg text-blue-600 font-semibold">
-                  Ticket: {ticket}
-                </span>
-              )}
-            </DialogTitle>
+          <div className="relative flex items-center justify-between pr-10">
+            {/* Título */}
+            <DialogHeader className="p-0">
+              <DialogTitle className="text-lg font-semibold">
+                Requerimiento · {headerText}
+              </DialogTitle>
+            </DialogHeader>
 
+            {/* Ticket a la derecha */}
+            {ticket && (
+              <a
+                href="#"
+                className="inline-flex items-center rounded-xl border bg-card px-3 py-1.5 text-sm font-semibold text-blue-600 shadow-sm hover:bg-accent hover:text-blue-700 transition-colors"
+              >
+                Ticket Ivanti {ticket}
+              </a>
+            )}
+
+            {/* Botón cerrar */}
             <DialogClose asChild>
               <button
-                className="absolute top-2 right-2 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                className="absolute top-1/2 -translate-y-1/2 right-0 p-2 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
                 aria-label="Cerrar"
               >
-              <IconX className="h-8 w-8" color="gray" />
+                <IconX className="h-5 w-5" />
               </button>
             </DialogClose>
-          </DialogHeader>
+          </div>
         </div>
 
         {/* Contenido */}
@@ -618,23 +627,34 @@ function RequestDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: 
 
       <DialogContent className="sm:max-w-3xl p-0">
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
-          <DialogHeader>
-            <DialogTitle>Requerimiento · {headerText} 
-              {ticket && (
-                <span className="ml-3 text-lg text-blue-600 font-semibold">
-                  Ticket: {ticket}
-                </span>
-              )}
-            </DialogTitle>
+          <div className="relative flex items-center justify-between pr-10">
+            {/* Título */}
+            <DialogHeader className="p-0">
+              <DialogTitle className="text-lg font-semibold">
+                Requerimiento · {headerText}
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* Ticket a la derecha */}
+            {ticket && (
+              <a
+                href="#"
+                className="inline-flex items-center rounded-xl border bg-card px-3 py-1.5 text-sm font-semibold text-blue-600 shadow-sm hover:bg-accent hover:text-blue-700 transition-colors"
+              >
+                Ticket Ivanti {ticket}
+              </a>
+            )}
+
+            {/* Botón cerrar */}
             <DialogClose asChild>
               <button
-                className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                className="absolute top-1/2 -translate-y-1/2 right-0 p-2 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
                 aria-label="Cerrar"
               >
                 <IconX className="h-5 w-5" />
               </button>
             </DialogClose>
-          </DialogHeader>
+          </div>
         </div>
 
         <div className="max-h-[78vh] overflow-y-auto px-6 py-5">
@@ -756,23 +776,34 @@ function FPQRSDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: ()
 
       <DialogContent className="sm:max-w-3xl p-0">
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4">
-          <DialogHeader>
-            <DialogTitle>FPQRS · {headerText}
-              {ticket && (
-                <span className="ml-3 text-lg text-blue-600 font-semibold">
-                  Ticket: {ticket}
-                </span>
-              )}
-            </DialogTitle>
+          <div className="relative flex items-center justify-between pr-10">
+            {/* Título */}
+            <DialogHeader className="p-0">
+              <DialogTitle className="text-lg font-semibold">
+                FPQRS · {headerText}
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* Ticket a la derecha */}
+            {ticket && (
+              <a
+                href="#"
+                className="inline-flex items-center rounded-xl border bg-card px-3 py-1.5 text-sm font-semibold text-blue-600 shadow-sm hover:bg-accent hover:text-blue-700 transition-colors"
+              >
+                Ticket Ivanti {ticket}
+              </a>
+            )}
+
+            {/* Botón cerrar */}
             <DialogClose asChild>
               <button
-                className="absolute top-4 right-4 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
+                className="absolute top-1/2 -translate-y-1/2 right-0 p-2 rounded-md opacity-70 hover:opacity-100 focus:outline-none"
                 aria-label="Cerrar"
               >
                 <IconX className="h-5 w-5" />
               </button>
             </DialogClose>
-          </DialogHeader>
+          </div>
         </div>
 
         <div className="max-h-[78vh] overflow-y-auto px-6 py-5">

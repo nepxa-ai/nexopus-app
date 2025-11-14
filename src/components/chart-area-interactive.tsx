@@ -30,14 +30,39 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
 
+
 // Config de series para ChartContainer (labels y colores via CSS vars)
 const chartConfig = {
   visitors: { label: "Casos atendidos e inyectados" },
-  incidentes: { label: "Incidentes", color: "var(--chart-1)" },
-  requerimiento: { label: "Requerimientos", color: "var(--chart-2)" },
-  fpqrs: { label: "FPQRS / Otros", color: "var(--chart-3)" },
-  consulta_caso: { label: "Consulta Caso", color: "var(--chart-4)" },
+
+  // Azul Nexopus – Incidentes
+  incidentes: { 
+    label: "Incidentes", 
+    color: "var(--chart-1a)" 
+  },
+
+  // Verde éxito – Requerimientos
+  requerimiento: { 
+    label: "Requerimientos", 
+    color: "var(--chart-2a)" 
+  },
+
+  // Amarillo suave – FPQRS / Otros
+  fpqrs: { 
+    label: "FPQRS", 
+    color: "var(--chart-3a)" 
+  },
+
+  // Coral suave – Consulta Caso
+  consulta_caso: { 
+    label: "Consulta Caso", 
+    color: "var(--chart-5a)" 
+  },
 } satisfies ChartConfig
+
+
+
+
 
 type WindowKey = "7d" | "30d" | "90d"
 

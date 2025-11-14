@@ -177,7 +177,7 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
 
       <div className="grid gap-4 md:grid-cols-1">
         <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">Contacto</Label>
+          <Label className="text-xs text-muted-foreground">Cliente/Contacto</Label>
           <Input disabled={disabled} value={v.contacto} onChange={(e) => setV((s) => ({ ...s, contacto: e.target.value }))} />
         </div>
         

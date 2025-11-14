@@ -167,32 +167,41 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
       >
 
       {/* ==================== CLIENTE Y PROPIETARIO ==================== */}
-      <h3 className="font-semibold">Cliente y Propietario</h3>
-
-      <div className="grid gap-4 md:grid-cols-2">
+      <h3 className="font-semibold">Información cliente</h3>
+      
+      <div className="grid gap-4 md:grid-cols-1">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="cliente" className="text-xs text-muted-foreground">Cliente</Label>
+          <Label htmlFor="cliente" className="text-xs text-muted-foreground">Cliente/Contacto</Label>
           <Input id="cliente" disabled={disabled} value={v.cliente} onChange={(e)=>setV(s=>({...s, cliente:e.target.value}))} />
-          <div className="text-xs text-muted-foreground">{v.correoCliente}</div>
         </div>
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs text-muted-foreground">Correo</Label>
+          <Input disabled={disabled} type="email" value={v.correoCliente} onChange={(e) => setV((s) => ({ ...s, correo: e.target.value }))} />
+        </div>
+      </div>
 
+      
+      <div className="grid gap-4 md:grid-cols-3">
+
+
+        {/*}
         <div className="flex flex-col gap-2">
           <Label htmlFor="telefono" className="text-xs text-muted-foreground">Teléfono</Label>
           <Input id="telefono" disabled={disabled} type="tel" inputMode="tel" value={v.telefono}
             onChange={(e)=>setV(s=>({...s, telefono:e.target.value}))} />
+        </div> */}
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="organizacion" className="text-xs text-muted-foreground">Organización</Label>
+          <Input id="organizacion" disabled={disabled} value={v.organizacion} onChange={(e)=>setV(s=>({...s, organizacion:e.target.value}))} />
         </div>
 
         <div className="flex items-center gap-3">
           <Label className="text-xs text-muted-foreground">VIP</Label>
           <Switch disabled={disabled} checked={v.vip} onCheckedChange={(vip)=>setV(s=>({...s, vip}))} />
         </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="organizacion" className="text-xs text-muted-foreground">Organización</Label>
-          <Input id="organizacion" disabled={disabled} value={v.organizacion}
-            onChange={(e)=>setV(s=>({...s, organizacion:e.target.value}))} />
-        </div>
-
+        
+        {/*
         <div className="flex flex-col gap-2">
           <Label htmlFor="nit" className="text-xs text-muted-foreground">NIT</Label>
           <Input id="nit" disabled={disabled} value={v.nit} onChange={(e)=>setV(s=>({...s, nit:e.target.value}))} />
@@ -208,12 +217,8 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
           <Input id="direccion" disabled={disabled} value={v.direccion}
             onChange={(e)=>setV(s=>({...s, direccion:e.target.value}))} />
         </div>
+        */}
 
-        <div className="md:col-span-2 flex flex-col gap-2">
-          <Label htmlFor="propietario" className="text-xs text-muted-foreground">Propietario</Label>
-          <Input id="propietario" disabled={disabled} value={v.propietario}
-            onChange={(e)=>setV(s=>({...s, propietario:e.target.value}))} />
-        </div>
       </div>
 
       <Separator />
@@ -254,6 +259,10 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
             </SelectContent>
           </Select>
         </div>
+      
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
 
         {/* Estado */}
         <div className="flex flex-col gap-2">
@@ -266,7 +275,25 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
           </Select>
         </div>
 
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs text-muted-foreground">Urgencia</Label>
+          <Select value={v.urgencia} onValueChange={(x) => setV((s) => ({ ...s, urgencia: x }))} disabled={disabled}>
+            <SelectTrigger><SelectValue placeholder="Urgencia" /></SelectTrigger>
+            <SelectContent>
+              {opcionesITSM.urgencia.map((x) => (
+                <SelectItem key={x} value={x}>{x}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Equipo */}
+        
+
+      </div>
+      
+      <div className="grid gap-4 md:grid-cols-2">
+
         <div className="flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Equipo</Label>
           <Select value={v.equipo} onValueChange={(equipo)=>setV(s=>({...s, equipo}))} disabled={disabled}>
@@ -276,6 +303,12 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
             </SelectContent>
           </Select>
         </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="propietario" className="text-xs text-muted-foreground">Propietario</Label>
+          <Input id="propietario" disabled={disabled} value={v.propietario}
+            onChange={(e)=>setV(s=>({...s, propietario:e.target.value}))} />
+        </div>
       </div>
 
       <Separator />
@@ -283,7 +316,7 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
       {/* ==================== INFORMACIÓN SOLICITUD ==================== */}
       <h3 className="font-semibold">Información Solicitud</h3>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="md:col-span-2 flex flex-col gap-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="asunto" className="text-xs text-muted-foreground">Asunto</Label>
           <Input id="asunto" disabled={disabled} value={v.asunto} onChange={(e)=>setV(s=>({...s, asunto:e.target.value}))} />
