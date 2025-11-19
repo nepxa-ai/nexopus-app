@@ -1,0 +1,4 @@
+# Ignorar estos archivos problemáticos
+src/app/operations/page.tsx
+src/components/data-table copy.tsx
+src/components/ui/drawer.tsx

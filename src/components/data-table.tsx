@@ -34,16 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
+
 
 import {
   DropdownMenu,
@@ -83,25 +74,36 @@ import {
   DialogClose
 } from "@/components/ui/dialog"
 
-
-
-import type { CaseItem } from "@/components/ui/forms-proceso/types"
-
 import { fetchWebhookEvents, type PaginatedWebhooks } from "@/lib/api-webhooks"
 import { fetchUserByExtensionLite } from "@/lib/api-users"
 import { fetchIncidentByDialvox, updateIncidentByDialvox, sendIncidentToITSM } from "@/lib/api-incidents"
 import { fetchRequestByDialvox, updateRequestByDialvox, sendRequestToITSM } from "@/lib/api-requirements"
 import { fetchFPQRSByDialvox, updateFPQRSByDialvox, sendFPQRSToITSM} from "@/lib/api-fpqrs"
-import { postFinLlamadaViaApi, postFinLlamadaDirect } from "@/lib/api-webhooks-flujos";
+import { postFinLlamadaDirect } from "@/lib/api-webhooks-flujos";
 
-import FormIncidente from "@/components/ui/forms-proceso/form-incidente"
-import FormRequerimiento from "@/components/ui/forms-proceso/form-requerimiento"
+import FormIncidente, {
+  type IncidentItem,
+} from "@/components/ui/forms-proceso/form-incidente"
+import FormRequerimiento, {
+  type ServiceRequestItem,
+} from "@/components/ui/forms-proceso/form-requerimiento"
+import FormFPQRS, {
+  type FpqrsItem,
+} from "@/components/ui/forms-proceso/form-fpqrs"
 
-import CaseFormRouter from "@/components/ui/forms-proceso/case-form-router"
 
 // ============================
 // Utils
 // ============================
+
+export type TipoSolicitud = 
+  | "Incidente"
+  | "Requerimiento"
+  | "Consulta de caso"
+  | "fpqrs"
+  | "none";
+
+
 const TZ = "America/Bogota"
 const dtf = new Intl.DateTimeFormat("es-CO", {
   dateStyle: "short",
@@ -140,9 +142,8 @@ function toMs(ts: number | string | undefined) {
   return n > 1e12 ? n : n * 1000
 }
 
-type CaseType = CaseItem["type"]
 
-function normalizeTipoSolicitudRaw(t?: string | null): CaseType | "none" {
+function normalizeTipoSolicitudRaw(t?: string | null): TipoSolicitud {
   const s = (t ?? "").toLowerCase().trim()
   if (s === "-" || s === "" || s === "na" || s === "n/a") return "none"
   if (s.includes("inc")) return "Incidente"
@@ -152,52 +153,6 @@ function normalizeTipoSolicitudRaw(t?: string | null): CaseType | "none" {
   return "none"
 }
 
-function rowToCaseItem(row: RowType): CaseItem {
-  return {
-    id: row.id,
-    header: row.id_dialvox_ != null ? String(row.id_dialvox_) : (row.id_llamada ?? "—"),
-    type: normalizeTipoSolicitudRaw(row.tipo_solicitud) as CaseType,
-    status: row.estado_caso ?? "Not Started",
-    target: row.phone ?? "",
-    limit: row.numero_caso ?? "",
-    reviewer: row.empresa_cliente ?? "Assign reviewer",
-  }
-}
-
-function TipoSolicitudModalFallback({ item }: { item: RowType }) {
-  return (
-    <div className="space-y-3 text-sm">
-      <p className="text-muted-foreground">
-        Este registro no tiene un tipo de solicitud asignado{" "}
-        (<span className="font-mono">{item.tipo_solicitud ?? "-"}</span>).
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <div className="text-xs text-muted-foreground">Id atención</div>
-          <div className="font-medium">
-            {item.id_dialvox_ ?? item.id_llamada ?? "—"}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-xs text-muted-foreground">Cliente</div>
-          <div className="font-medium">{item.nombre_cliente ?? "—"}</div>
-        </div>
-
-        <div>
-          <div className="text-xs text-muted-foreground">Teléfono</div>
-          <div className="font-medium">{item.phone ?? "—"}</div>
-        </div>
-
-        <div>
-          <div className="text-xs text-muted-foreground">Empresa</div>
-          <div className="font-medium">{item.empresa_cliente ?? "—"}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ============================
 // Schema (nota: extension -> coerce.number)
@@ -247,24 +202,40 @@ type RowType = z.infer<typeof schema>
 // ============================
 type DateRange = { from?: string; to?: string }
 
-const dateRangeFilter = (row: any, columnId: string, value?: DateRange) => {
+const dateRangeFilter = (
+  row: Row<RowType>,
+  columnId: string,
+  value?: DateRange
+) => {
   if (!value || (!value.from && !value.to)) return true
-  const cell = row.original?.[columnId]
-  const ts = cell ? new Date(cell).getTime() : NaN
+
+  // Acceso tip-safe al valor de la celda
+  const raw = (row.original as Record<string, unknown>)[columnId]
+
+  let ts = NaN
+  if (raw instanceof Date) {
+    ts = raw.getTime()
+  } else if (typeof raw === "string" || typeof raw === "number") {
+    ts = new Date(raw).getTime()
+  }
+
   if (Number.isNaN(ts)) return false
+
   const fromOk = value.from ? ts >= new Date(value.from).getTime() : true
   const toOk = value.to ? ts <= new Date(value.to).getTime() : true
   return fromOk && toOk
 }
 
 const booleanTriStateFilter = (
-  row: any,
+  row: Row<RowType>,
   columnId: string,
   value?: "all" | "true" | "false"
 ) => {
   if (!value || value === "all") return true
-  const cell = row.original?.[columnId]
-  const bool = Boolean(cell)
+
+  const raw = (row.original as Record<string, unknown>)[columnId]
+  const bool = Boolean(raw)
+
   return value === "true" ? bool : !bool
 }
 
@@ -272,126 +243,17 @@ const booleanTriStateFilter = (
 // Drawer de detalle (Id atención)
 // ============================
 // 
-function IdAtencionCell({ item }: { item: RowType }) {
-  const [incident, setIncident] = React.useState<any | null>(null)
-  const [loading, setLoading] = React.useState(false)
-  const [editable, setEditable] = React.useState(false)
 
-  
-
-  const isIncident = item.tipo_solicitud?.toLowerCase().includes("inci")
-
-  async function loadIncident() {
-    if (!isIncident || !item.id_dialvox_) return
-    setLoading(true)
-    try {
-      const res = await fetchIncidentByDialvox(item.id_dialvox_)
-      setIncident(res)
-      setEditable(true)
-    } catch (e) {
-      toast.error("Error al cargar incidente")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const headerText =
-    (item.id_dialvox_ != null ? String(item.id_dialvox_) : null) ??
-    item.id_llamada ??
-    "—"
-
-  return (
-    <Drawer>
-      <DrawerTrigger asChild>
-        <Button
-          variant="link"
-          className="text-foreground w-fit px-0 text-left"
-          onClick={loadIncident}
-        >
-          {headerText}
-        </Button>
-      </DrawerTrigger>
-
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{headerText}</DrawerTitle>
-          <DrawerDescription>
-            {isIncident ? "Detalle de incidente" : "Detalle de atención"}
-          </DrawerDescription>
-        </DrawerHeader>
-
-        <div className="p-4 overflow-y-auto max-h-[75vh]">
-          {loading && <p>Cargando incidente...</p>}
-
-          {editable && incident ? (
-            <FormIncidente
-              item={incident}
-              onSubmit={async (formValues) => {
-                try {
-                  const patched = await updateIncidentByDialvox(item.id_dialvox_, formValues)
-                  toast.success("Incidente actualizado correctamente")
-                  await sendIncidentToITSM(patched)
-                  toast.success("Incidente enviado al ITSM")
-                } catch {
-                  toast.error("Error actualizando o enviando incidente")
-                }
-              }}
-            />
-          ) : (
-            !loading && (
-              <div className="text-sm text-muted-foreground">
-                {isIncident
-                  ? "Haz clic para cargar los detalles del incidente"
-                  : "Atención sin incidente asociado"}
-              </div>
-            )
-          )}
-        </div>
-
-        {incident && (
-          <DrawerFooter className="flex flex-col gap-2">
-            <Button
-              onClick={async () => {
-                try {
-                  const patched = await updateIncidentByDialvox(item.id_dialvox_, incident)
-                  toast.success("Aprobado con ajustes")
-                  await sendIncidentToITSM(patched)
-                  toast.success("Enviado al ITSM")
-                } catch {
-                  toast.error("Error al aprobar o enviar incidente")
-                }
-              }}
-            >
-              Aprobar con ajustes
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={async () => {
-                try {
-                  await sendIncidentToITSM(incident)
-                  toast.success("Incidente enviado al ITSM")
-                } catch {
-                  toast.error("Error al enviar al ITSM")
-                }
-              }}
-            >
-              Enviar al ITSM
-            </Button>
-
-            <DrawerClose asChild>
-              <Button variant="ghost">Cerrar</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        )}
-      </DrawerContent>
-    </Drawer>
-  )
+type TicketRecord = {
+  ticket?: string
+  ticket_number?: string
+  [key: string]: unknown
 }
+
 
 function IncidentDialog({ row, onAfterChange }: { row: RowType; onAfterChange?: () => void }){
   const [loading, setLoading] = React.useState(false)
-  const [incident, setIncident] = React.useState<any | null>(null)
+  const [incident, setIncident] = React.useState<TicketRecord  | null>(null)
   const [editing, setEditing] = React.useState(false)
   const [saved, setSaved] = React.useState(false)
   const [ticket, setTicket] = React.useState<string | null>(null) // ← Nuevo estado
@@ -431,7 +293,7 @@ function IncidentDialog({ row, onAfterChange }: { row: RowType; onAfterChange?: 
     }
   }
 
-  async function guardarYEnviar(payload?: any) {
+  async function guardarYEnviar(payload?: Record<string, unknown>) {
     if (!row.id_dialvox_) return
     try {
       if (!payload || Object.keys(payload).length === 0) {
@@ -551,7 +413,7 @@ function IncidentDialog({ row, onAfterChange }: { row: RowType; onAfterChange?: 
 
 function RequestDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }){
   const [loading, setLoading] = React.useState(false)
-  const [request, setRequest] = React.useState<any | null>(null)
+  const [request, setRequest] = React.useState<TicketRecord | null>(null)
   const [editing, setEditing] = React.useState(false)
   const [saved, setSaved] = React.useState(false)
   const [ticket, setTicket] = React.useState<string | null>(null) // ← Nuevo estado
@@ -589,7 +451,7 @@ function RequestDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: 
     }
   }
 
-  async function guardarYEnviarRequest(payload?: any) {
+  async function guardarYEnviarRequest(payload?: Record<string, unknown>) {
     if (!row.id_dialvox_) return
     try {
       if (!payload || Object.keys(payload).length === 0) {
@@ -662,7 +524,7 @@ function RequestDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: 
 
           {!loading && request && (
             <FormRequerimiento
-              item={request}
+              item={request as unknown as ServiceRequestItem}
               readOnly={!editing}
               hideSubmit={false}
               onSubmit={async (payload) => {
@@ -699,7 +561,7 @@ function RequestDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: 
 
 function FPQRSDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: () => void }){
   const [loading, setLoading] = React.useState(false)
-  const [request, setRequest] = React.useState<any | null>(null)
+  const [request, setRequest] = React.useState<TicketRecord | null>(null)
   const [editing, setEditing] = React.useState(false)
   const [saved, setSaved] = React.useState(false)
   const [ticket, setTicket] = React.useState<string | null>(null) // ← Nuevo estado
@@ -738,7 +600,7 @@ function FPQRSDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: ()
     }
   }
 
-  async function guardarYEnviarRequest(payload?: any) {
+  async function guardarYEnviarRequest(payload?: Record<string, unknown>) {
     if (!row.id_dialvox_) return
     try {
       if (!payload || Object.keys(payload).length === 0) {
@@ -811,7 +673,7 @@ function FPQRSDialog( { row, onAfterChange }: { row: RowType; onAfterChange?: ()
 
           {!loading && request && (
             <FormRequerimiento
-              item={request}
+              item={request as unknown as ServiceRequestItem}
               readOnly={!editing}
               hideSubmit={false}
               onSubmit={async (payload) => {
@@ -866,11 +728,22 @@ function parseFlatTranscript(s: string): TranscriptMsg[] {
   return out
 }
 
-function normalizeTranscript(value: any, fallbackText?: string): TranscriptMsg[] {
-  if (Array.isArray(value?.transcript)) return value.transcript as TranscriptMsg[]
-  if (Array.isArray(value)) return value as TranscriptMsg[]
-  if (typeof value === "string") return parseFlatTranscript(value)
-  if (typeof fallbackText === "string") return parseFlatTranscript(fallbackText)
+function normalizeTranscript(value: unknown, fallbackText?: string): TranscriptMsg[] {
+  // Caso 1: ya es un arreglo de mensajes
+  if (Array.isArray(value)) {
+    return value as TranscriptMsg[]
+  }
+
+  // Caso 2: es texto plano (transcript_text o similar)
+  if (typeof value === "string") {
+    return parseFlatTranscript(value)
+  }
+
+  // Caso 3: no hay valor, pero tenemos texto de respaldo
+  if (typeof fallbackText === "string") {
+    return parseFlatTranscript(fallbackText)
+  }
+
   return []
 }
 
@@ -1088,7 +961,7 @@ export function FinalizarCellButton({
   row,
   useProxy = true, // si tienes /api/forward/..., déjalo true
 }: {
-  row: any;
+  row: RowType;
   useProxy?: boolean;
 }) {
   const [loading, setLoading] = React.useState(false);
@@ -1113,8 +986,9 @@ export function FinalizarCellButton({
         await postFinLlamadaDirect(payload, 10000);
       }
       toast.success("Webhook fin-llamada enviado");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Error llamando al webhook");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error llamando al webhook"
+      toast.error(msg)
     } finally {
       setLoading(false);
     }
@@ -1167,13 +1041,19 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
     },
 
     // 1) Id atención
-    { id: "id_atencion",
+    {
+      id: "id_atencion",
       header: "Id atención",
       accessorFn: (row) => (row.id_dialvox_ != null ? String(row.id_dialvox_) : "—"),
-      cell: ({ row }) => <IdAtencionCell item={row.original} />,
+      cell: ({ row }) => (
+        <span className="font-mono">
+          {row.original.id_dialvox_ != null ? String(row.original.id_dialvox_) : "—"}
+        </span>
+      ),
       enableHiding: false,
       enableSorting: false,
     },
+
 
     //1.5 boton finalizar 
     {
@@ -1267,18 +1147,21 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
       header: "Empresa"
     },
     //10) VIP
-    { accessorKey: "es_vip",
+    { 
+      accessorKey: "es_vip",
       header: "VIP",
-      filterFn: "booleanTri",
+      filterFn: booleanTriStateFilter,
       cell: ({ row }) =>
-        row.original.es_vip ? <Badge variant="secondary">VIP</Badge> : <span className="text-muted-foreground">No</span>,
+        row.original.es_vip
+          ? <Badge variant="secondary">VIP</Badge>
+          : <span className="text-muted-foreground">No</span>,
     },
     
     //11) En horario de llamada
     /*
     { accessorKey: "en_horario",
       header: "en_horario",
-      filterFn: "booleanTri",
+      filterFn: booleanTriStateFilter,
       cell: ({ row }) =>
         row.original.en_horario ? <Badge variant="outline">En horario</Badge> : <span className="text-muted-foreground">Fuera de horario</span>,
     },
@@ -1378,7 +1261,7 @@ function Toolbar({
   showServerFilters?: boolean
   }) {
   const searchCol = table.getColumn("search")
-  //const startedCol = table.getColumn("started_at")
+  const startedCol = table.getColumn("started_at")
   const vipCol = table.getColumn("es_vip")
   const horarioCol = table.getColumn("en_horario")
 
@@ -1442,7 +1325,7 @@ function Toolbar({
 
         <div className="flex items-center gap-2">
           <Label className="text-sm font-medium">VIP</Label>
-          <Select defaultValue="all" onValueChange={(val) => vipCol?.setFilterValue(val as any)}>
+          <Select defaultValue="all" onValueChange={(val) => vipCol?.setFilterValue(val as "all" | "true" | "false") } >
             <SelectTrigger className="h-8 w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -1456,7 +1339,7 @@ function Toolbar({
 
         <div className="flex items-center gap-2">
           <Label className="text-sm font-medium">Horario</Label>
-          <Select defaultValue="all" onValueChange={(val) => horarioCol?.setFilterValue(val as any)}>
+          <Select defaultValue="all" onValueChange={(val) => vipCol?.setFilterValue(val as "all" | "true" | "false") } >
             <SelectTrigger className="h-8 w-[160px]">
               <SelectValue />
             </SelectTrigger>
@@ -1524,8 +1407,9 @@ const refetch = React.useCallback(async () => {
       id_llamada: serverFilters.id_llamada,
     })
     setPage(res)
-  } catch (e: any) {
-    setError(e?.message ?? "Error cargando eventos")
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Error cargando eventos"
+    setError(msg)
     toast.error("No se pudo cargar eventos")
   } finally {
     setLoading(false)
@@ -1623,7 +1507,6 @@ React.useEffect(() => {
     
     filterFns: {
       dateRange: dateRangeFilter,
-      booleanTri: booleanTriStateFilter,
       includesString: (row, columnId, filterValue) => {
         if (!filterValue) return true
         const v = String(row.getValue(columnId) ?? "").toLowerCase()

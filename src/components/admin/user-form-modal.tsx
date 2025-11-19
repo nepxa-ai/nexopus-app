@@ -6,13 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 
-type FormUser = {
+export type FormUser = {
   email: string;
   nombres: string;
   apellidos: string;
-  password?: string; // requerido solo en creación
+  password?: string;     // requerido solo en creación
   rol: "admin" | "user";
-  extension?: number; // -1 por defecto si no se envía
+  extension?: number;    // -1 por defecto si no se envía
 };
 
 export function UserFormModal({
@@ -94,7 +94,7 @@ export function UserFormModal({
 
           <div className="grid gap-2">
             <Label>Rol</Label>
-            <Select value={form.rol} onValueChange={(v) => set("rol", v as any)}>
+            <Select value={form.rol} onValueChange={(v: FormUser["rol"]) => set("rol", v)}>  
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">admin</SelectItem>

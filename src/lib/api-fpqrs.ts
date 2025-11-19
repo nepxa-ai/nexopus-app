@@ -1,10 +1,6 @@
-function authHeaders() {
-  if (typeof window === "undefined") return {}
-  const token = localStorage.getItem("access_token")
-  return token
-    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-    : { "Content-Type": "application/json" }
-}
+// lib/api-fpqrs.ts
+import { authHeaders, authJsonHeaders } from "./api-auth"
+
 
 export async function fetchFPQRSByDialvox(id_dvx: number | string) {
   const r = await fetch(`/api/fpqrs/by-id_dialvox/${id_dvx}`, {
@@ -15,22 +11,28 @@ export async function fetchFPQRSByDialvox(id_dvx: number | string) {
   return r.json()
 }
 
-export async function updateFPQRSByDialvox(id_dvx: number | string, data: any) {
+export async function updateFPQRSByDialvox(
+  id_dvx: number | string,
+  data: unknown
+) {
   const r = await fetch(`/api/fpqrs/by-id_dialvox/${id_dvx}`, {
     method: "PATCH",
-    headers: authHeaders(),
+    headers: authJsonHeaders(),
     body: JSON.stringify(data),
   })
   if (!r.ok) throw new Error(`Error al actualizar el incidente (HTTP ${r.status})`)
   return r.json()
 }
 
-export async function sendFPQRSToITSM(data: any) {
-  const r = await fetch(`https://10.34.7.10:5678/n8n/webhook/crear-fpqrs-ivanti`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
+export async function sendFPQRSToITSM(data: unknown) {
+  const r = await fetch(
+    `https://10.34.7.10:5678/n8n/webhook/crear-requerimiento-ivanti`,
+    {
+      method: "POST",
+      headers: authJsonHeaders(),
+      body: JSON.stringify(data),
+    }
+  )
   if (!r.ok) throw new Error(`Error al enviar al ITSM (HTTP ${r.status})`)
   return r.json()
 }

@@ -2,7 +2,6 @@ import type { Dict, JSONValue } from "@/lib/types";
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 
-
 export type WebhookEvent = {
   id: number
   id_dialvox_: number | null
@@ -21,8 +20,8 @@ export type WebhookEvent = {
   servicio: string | null
   prioridad: number | null
   en_horario: boolean | null
-  extracted_variables: Dict<JSONValue> | null   // ← antes: any
-  contratos_empresa: Dict<JSONValue> | null     // ← antes: any
+  extracted_variables: Dict<JSONValue> | null   
+  contratos_empresa: Dict<JSONValue> | null   
   transcript_text: string | null
   recording_url: string | null
   transcript_url: string | null

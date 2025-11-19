@@ -29,7 +29,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-// ✅ Usa TODO desde el catálogo central
+
 import {
   CatalogServicios,
   CatalogCategorias,
@@ -40,7 +40,7 @@ import {
 } from "@/lib/api-catalog";
 
 // ------------------------------------------------------------
-// Hook CRUD genérico que se conecta a api-catalog
+// CRUD genérico que se conecta a api-catalog
 // ------------------------------------------------------------
 function useCrud<T extends { id: number }>(
   listFn: (
@@ -65,19 +65,21 @@ function useCrud<T extends { id: number }>(
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const load = React.useCallback(async () => {
+    const load = React.useCallback(async () => {
     setLoading(true);
     try {
       const data = await listFn(page, size, q, filterId);
       setItems(data.items);
       setTotal(data.total);
       setError(null);
-    } catch (e: any) {
-      setError(e?.message || "Error");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   }, [listFn, page, size, q, filterId]);
+
 
   React.useEffect(() => {
     load();
@@ -140,7 +142,7 @@ function ServicioFormModal({
         descripcion: initial?.descripcion || "",
       });
   }, [open, initial]);
-  function set<K extends keyof Servicio>(k: K, v: any) {
+  function set<K extends keyof Servicio>(k: K, v: Servicio[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
   async function handleSubmit(e: React.FormEvent) {
@@ -220,7 +222,7 @@ function CategoriaFormModal({
         id_servicio: initial?.id_servicio ?? (servicios[0]?.id || 0),
       });
   }, [open, initial, servicios]);
-  function set<K extends keyof Categoria>(k: K, v: any) {
+  function set<K extends keyof Categoria>(k: K, v: Categoria[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
   async function handleSubmit(e: React.FormEvent) {
@@ -318,7 +320,7 @@ function SubcategoriaFormModal({
         id_categoria: initial?.id_categoria ?? (categorias[0]?.id || 0),
       });
   }, [open, initial, categorias]);
-  function set<K extends keyof Subcategoria>(k: K, v: any) {
+  function set<K extends keyof Subcategoria>(k: K, v: Subcategoria[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
   async function handleSubmit(e: React.FormEvent) {
@@ -436,11 +438,28 @@ function SimpleTable<T extends { id: number }>({
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t">
-                {columns.map((c, i) => (
-                  <td key={i} className={`p-3 ${c.className || ""}`}>
-                    {c.render ? c.render(r) : (r as any)[c.key as string]}
-                  </td>
-                ))}
+                {columns.map((c, i) => {
+                    const rec = r as Record<string, unknown>
+
+                    let content: React.ReactNode
+
+                    if (c.render) {
+                      content = c.render(r)
+                    } else {
+                      const raw = rec[c.key as string]
+                      // Si solo esperas texto/número, mejor lo normalizas a string
+                      content =
+                        raw === null || raw === undefined
+                          ? ""
+                          : (raw as React.ReactNode)
+                    }
+
+                    return (
+                      <td key={i} className={`p-3 ${c.className || ""}`}>
+                        {content}
+                      </td>
+                    )
+                  })}
                 <td className="p-3 text-right">
                   <div className="flex justify-end gap-2">
                     <Button
@@ -485,11 +504,18 @@ function SimpleTable<T extends { id: number }>({
 export default function ITSMAdminTabs() {
   // Servicios (CRUD desde catálogo)
   const svc = useCrud<Servicio>(
-    CatalogServicios.listPage,
-    (p) => CatalogServicios.create(p as any),
-    (id, p) => CatalogServicios.update(id, p as any),
-    CatalogServicios.remove
-  );
+  CatalogServicios.listPage,
+  (p) =>
+    CatalogServicios.create(
+      p as Parameters<typeof CatalogServicios.create>[0]
+    ),
+  (id, p) =>
+    CatalogServicios.update(
+      id,
+      p as Parameters<typeof CatalogServicios.update>[1]
+    ),
+  CatalogServicios.remove
+);
   const [openSvc, setOpenSvc] = React.useState(false);
   const [svcMode, setSvcMode] = React.useState<"create" | "edit">("create");
   const [svcSel, setSvcSel] = React.useState<Servicio | undefined>(undefined);
@@ -497,11 +523,19 @@ export default function ITSMAdminTabs() {
 
   // Categorías
   const cat = useCrud<Categoria>(
-    CatalogCategorias.listPage,
-    (p) => CatalogCategorias.create(p as any),
-    (id, p) => CatalogCategorias.update(id, p as any),
-    CatalogCategorias.remove
-  );
+  CatalogCategorias.listPage,
+  (p) =>
+    CatalogCategorias.create(
+      p as Parameters<typeof CatalogCategorias.create>[0]
+    ),
+  (id, p) =>
+    CatalogCategorias.update(
+      id,
+      p as Parameters<typeof CatalogCategorias.update>[1]
+    ),
+  CatalogCategorias.remove
+);
+
   const [openCat, setOpenCat] = React.useState(false);
   const [catMode, setCatMode] = React.useState<"create" | "edit">("create");
   const [catSel, setCatSel] = React.useState<Categoria | undefined>(undefined);
@@ -510,10 +544,18 @@ export default function ITSMAdminTabs() {
   // Subcategorías
   const sub = useCrud<Subcategoria>(
     CatalogSubcategorias.listPage,
-    (p) => CatalogSubcategorias.create(p as any),
-    (id, p) => CatalogSubcategorias.update(id, p as any),
+    (p) =>
+      CatalogSubcategorias.create(
+        p as Parameters<typeof CatalogSubcategorias.create>[0]
+      ),
+    (id, p) =>
+      CatalogSubcategorias.update(
+        id,
+        p as Parameters<typeof CatalogSubcategorias.update>[1]
+      ),
     CatalogSubcategorias.remove
   );
+
   const [openSub, setOpenSub] = React.useState(false);
   const [subMode, setSubMode] = React.useState<"create" | "edit">("create");
   const [subSel, setSubSel] = React.useState<Subcategoria | undefined>(
@@ -532,65 +574,76 @@ export default function ITSMAdminTabs() {
   async function submitServicio(data: Partial<Servicio>) {
     setSubmittingSvc(true);
     try {
-      if (svcMode === "create")
+      if (svcMode === "create") {
         await svc.create({
           nombre: data.nombre,
           descripcion: data.descripcion,
-        } as any);
-      else if (svcSel)
+        });
+      } else if (svcSel) {
         await svc.update(svcSel.id, {
           nombre: data.nombre,
           descripcion: data.descripcion,
-        } as any);
+        });
+      }
       setOpenSvc(false);
-    } catch (e: any) {
-      alert(e.message || "Error al guardar servicio");
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error ? e.message : "Error al guardar servicio";
+      alert(msg);
     } finally {
       setSubmittingSvc(false);
     }
   }
 
+
   async function submitCategoria(data: Partial<Categoria>) {
     setSubmittingCat(true);
     try {
-      if (catMode === "create")
+      if (catMode === "create") {
         await cat.create({
           nombre: data.nombre,
           descripcion: data.descripcion,
           id_servicio: data.id_servicio,
-        } as any);
-      else if (catSel)
+        });
+      } else if (catSel) {
         await cat.update(catSel.id, {
           nombre: data.nombre,
           descripcion: data.descripcion,
           id_servicio: data.id_servicio,
-        } as any);
+        });
+      }
       setOpenCat(false);
-    } catch (e: any) {
-      alert(e.message || "Error al guardar categoría");
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error ? e.message : "Error al guardar categoría";
+      alert(msg);
     } finally {
       setSubmittingCat(false);
     }
   }
 
+
   async function submitSubcategoria(data: Partial<Subcategoria>) {
     setSubmittingSub(true);
     try {
-      if (subMode === "create")
+      if (subMode === "create") {
         await sub.create({
           nombre: data.nombre,
           descripcion: data.descripcion,
           id_categoria: data.id_categoria,
-        } as any);
-      else if (subSel)
+        });
+      } else if (subSel) {
         await sub.update(subSel.id, {
           nombre: data.nombre,
           descripcion: data.descripcion,
           id_categoria: data.id_categoria,
-        } as any);
+        });
+      }
       setOpenSub(false);
-    } catch (e: any) {
-      alert(e.message || "Error al guardar subcategoría");
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error ? e.message : "Error al guardar subcategoría";
+      alert(msg);
     } finally {
       setSubmittingSub(false);
     }
@@ -599,10 +652,10 @@ export default function ITSMAdminTabs() {
   // Precarga combos (servicios para categorías; categorías para subcategorías)
   React.useEffect(() => {
     if (svc.items.length === 0) svc.reload();
-  }, []);
+  });
   React.useEffect(() => {
     if (cat.items.length === 0) cat.reload();
-  }, []);
+  });
 
   return (
     <div className="p-4 space-y-4">
@@ -827,12 +880,13 @@ export default function ITSMAdminTabs() {
                 if (!toDelete) return;
                 try {
                   if (toDelete.type === "svc") await svc.remove(toDelete.id);
-                  else if (toDelete.type === "cat")
-                    await cat.remove(toDelete.id);
+                  else if (toDelete.type === "cat") await cat.remove(toDelete.id);
                   else await sub.remove(toDelete.id);
                   setToDelete(null);
-                } catch (e: any) {
-                  alert(e.message || "Error al eliminar");
+                } catch (e: unknown) {
+                  const msg =
+                    e instanceof Error ? e.message : "Error al eliminar";
+                  alert(msg);
                 }
               }}
             >

@@ -42,9 +42,11 @@ export async function recuperarContrasena(
       ok: true,
       message: "Por favor revisar el correo registrado.",
     };
-  } catch (err: any) {
-    throw new Error(
-      err?.message || "No se pudo iniciar la recuperación de contraseña."
-    );
+  } catch (err: unknown) {
+    const msg =
+      err instanceof Error
+        ? err.message
+        : "No se pudo iniciar la recuperación de contraseña.";
+    throw new Error(msg);
   }
 }

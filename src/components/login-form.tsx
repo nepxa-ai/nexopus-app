@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { apiLogin, fetchMe } from "@/lib/api";
+import { apiLogin, fetchMe } from "@/lib/api-auth";;
 import { recuperarContrasena } from "@/lib/api-recuperacion";
 
 import Image from "next/image";
@@ -24,18 +24,19 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
   const router = useRouter();
 
-  async function onSubmit(e: React.FormEvent) {
+async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setRecoverMsg(null);
     setLoading(true);
     try {
-      const { access_token } = await apiLogin({ username: email, password });
-      localStorage.setItem("access_token", access_token);
-      await fetchMe(access_token);
+      await apiLogin(email, password);
+      await fetchMe();
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err?.message || "Error de autenticación");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Error de autenticación";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -54,8 +55,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     try {
       const res = await recuperarContrasena(email.trim());
       setRecoverMsg(res.message || "Si el correo existe, se enviaron instrucciones.");
-    } catch (err: any) {
-      setError(err?.message || "No se pudo iniciar la recuperación.");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "No se pudo iniciar la recuperación.";
+      setError(msg);
     } finally {
       setRecoverLoading(false);
     }

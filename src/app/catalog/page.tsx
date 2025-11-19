@@ -6,10 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { fetchMe } from "@/lib/api";
+import { fetchMe } from "@/lib/api-auth";
 
-// 👇 Este es el componente con Tabs (Servicios / Categorías / Subcategorías)
-// que ya generamos antes y usa lib/api-catalog.ts internamente.
 import ITSMAdminTabs from "@/components/itsm-catalog/itsm-catalog";
 
 export default function CatalogPage() {
@@ -17,12 +15,8 @@ export default function CatalogPage() {
   const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-    fetchMe(token)
+
+    fetchMe()
       .then((me) => {
         // si quieres limitar al rol admin, deja esta validación:
         if (me?.rol !== "admin") {

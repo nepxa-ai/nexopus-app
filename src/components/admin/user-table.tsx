@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { fetchUsers, toggleActive, updateUser, createUser, deleteUser } from "@/lib/admin-api";
-import { UserFormModal } from "./user-form-modal";
+import { UserFormModal, type FormUser } from "./user-form-modal";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 type User = Awaited<ReturnType<typeof fetchUsers>>["items"][number];
@@ -31,7 +31,7 @@ export function UsersTable() {
     setToken(t);
   }, []);
 
-  async function load() {
+  const load = React.useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -39,24 +39,21 @@ export function UsersTable() {
       setData(p.items);
       setTotal(p.total);
       setError(null);
-    } catch (e: any) {
-      setError(e.message || "Error");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }
+  }, [token, page]);
 
-  React.useEffect(() => { load(); /* eslint-disable-next-line */ }, [token, page]);
+  React.useEffect(() => {
+  load();
+}, [load]);
 
   async function onToggleActive(u: User, v: boolean) {
     if (!token) return;
     const updated = await toggleActive(token, u.id, v);
-    setData(prev => prev.map(x => x.id === u.id ? updated : x));
-  }
-
-  async function onInlineEdit(u: User, partial: Partial<Pick<User,"nombres"|"apellidos"|"email"|"rol"|"extension">>) {
-    if (!token) return;
-    const updated = await updateUser(token, u.id, partial);
     setData(prev => prev.map(x => x.id === u.id ? updated : x));
   }
 
@@ -65,49 +62,73 @@ export function UsersTable() {
     setSelected(null);
     setOpenForm(true);
   }
+
   function openEdit(u: User) {
     setFormMode("edit");
     setSelected(u);
     setOpenForm(true);
   }
-  async function handleSubmitForm(payload: any) {
-    if (!token) return;
-    setSubmitting(true);
-    try {
-      if (formMode === "create") {
-        await createUser(token, payload);
-      } else if (selected) {
-        await updateUser(token, selected.id, {
-          email: payload.email,
-          nombres: payload.nombres,
-          apellidos: payload.apellidos,
-          rol: payload.rol,
-          extension: typeof payload.extension === "number" ? payload.extension : -1,
-        });
+
+async function handleSubmitForm(payload: FormUser) {
+  if (!token) return;
+  setSubmitting(true);
+
+  try {
+    if (formMode === "create") {
+      // aseguramos que haya password
+      if (!payload.password) {
+        setError("La contraseña es obligatoria para crear un usuario");
+        return;
       }
-      setOpenForm(false);
-      await load();
-    } catch (e: any) {
-      alert(e.message || "Error al guardar");
-    } finally {
-      setSubmitting(false);
+
+      await createUser(token, {
+        email: payload.email,
+        password: payload.password, // aquí ya es string, no undefined
+        nombres: payload.nombres,
+        apellidos: payload.apellidos,
+        rol: payload.rol,
+        extension: payload.extension,
+      });
+    } else if (selected) {
+      await updateUser(token, selected.id, {
+        email: payload.email,
+        nombres: payload.nombres,
+        apellidos: payload.apellidos,
+        rol: payload.rol,
+        extension: payload.extension,
+        // no mandas password si no quieres cambiarla
+      });
     }
+
+    // cerrar modal y refrescar tabla
+    setOpenForm(false);
+    setSelected(null);
+    await load();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Error al guardar";
+    alert(msg);
+  } finally {
+    setSubmitting(false);
   }
+}
 
   function askDelete(u: User) {
     setSelected(u);
     setOpenDelete(true);
   }
-  async function confirmDelete() {
+
+    async function confirmDelete() {
     if (!token || !selected) return;
     try {
       await deleteUser(token, selected.id);
       setOpenDelete(false);
       await load();
-    } catch (e: any) {
-      alert(e.message || "Error al eliminar");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al eliminar";
+      alert(msg);
     }
   }
+
 
   if (loading) return <div className="p-4">Cargando…</div>;
   if (error) return <div className="p-4 text-red-600">{error}</div>;

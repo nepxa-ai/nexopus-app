@@ -6,7 +6,7 @@ export type User = {
   email: string;
   nombres: string;
   apellidos: string;
-  rol: "admin" | "user" | "viewer";
+  rol: "admin" | "user";
   activo: boolean;
   extension: number; // -1 = sin extensión
   fecha_creado: string;
@@ -70,7 +70,7 @@ export async function createUser(
     password: string;
     nombres: string;
     apellidos: string;
-    rol?: "admin" | "user" | "viewer";
+    rol?: "admin" | "user";
     extension?: number;
   }
 ): Promise<User> {

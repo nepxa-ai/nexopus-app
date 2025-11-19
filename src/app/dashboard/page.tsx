@@ -5,7 +5,7 @@ import { AuthGate } from "@/components/auth-gate";
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { ChartBarStacked } from "@/components/chart-area-interactive"
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+//import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 //import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 //import { DataTable } from "@/components/data-table"
 import DataTable from "@/components/data-table";

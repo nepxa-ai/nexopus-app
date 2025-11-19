@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { CaseItem } from "./types"
 import { opcionesGenerales } from "./opciones"
 
-type Props = { item: CaseItem; onSubmit?: (payload: any) => void }
+type Props = { item: CaseItem; onSubmit?: (payload: CaseItem) => void }
 
 export default function FormConsultaCaso({ item, onSubmit }: Props) {
   const [v, setV] = React.useState({

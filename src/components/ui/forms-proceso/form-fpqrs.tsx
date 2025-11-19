@@ -14,12 +14,86 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { opcionesITSM, opcionesITSM_fpqrs } from "@/components/ui/forms-proceso/opciones"
 
+export type FpqrsItem = {
+  // Claves principales
+  id?: number
+  id_dialvox_?: string | null
+  status_system?: string | null
+  ticket?: number | null
+  form_name?: string | null
+
+  // Campos de servicio / clasificación
+  r_service?: string | null
+  service?: string | null          // alias que a veces llega del backend
+  category?: string | null
+  subcategory?: string | null
+  detalle?: string | null
+  symptom?: string | null
+
+  // Solicitud
+  asunto?: string | null
+  owner_team?: string | null
+  urgency?: string | number | null
+  priority?: string | number | null
+  status?: string | null
+  source?: string | null
+
+  // JSONB / adjuntos
+  parameters?: Record<string, unknown> | null
+  attachments_to_delete?: unknown[] | null
+  attachments_to_upload?: unknown[] | null
+  delayed_fulfill?: boolean | null
+  save_req_state?: boolean | null
+  extra?: {
+    nit?: string | null
+    ciudad?: string | null
+    direccion?: string | null
+    telefono?: string | null
+    [k: string]: unknown
+  } | null
+
+  // Datos “str_…”
+  str_customer_location?: string | null
+  str_user_id?: string | null
+  subscription_id?: string | null
+  local_offset?: string | null
+
+  // Cliente
+  is_vip?: boolean | null
+  nombre_cliente?: string | null
+  correo_cliente?: string | null
+  empresa_cliente?: string | null
+
+  // Auditoría
+  creado_por_user_id?: number | null
+  creado_por?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+
+  // ---- Aliases / campos solo de front que ya usas en el form ----
+  cliente?: string | null
+  correoCliente?: string | null
+  telefono?: string | null
+  vip?: boolean | null
+  organizacion?: string | null
+  nit?: string | null
+  ciudad?: string | null
+  direccion?: string | null
+  propietario?: string | null
+
+  // Adjuntos “genéricos” que usas fuera de la UI
+  adjuntos?: unknown[]
+} & Record<string, unknown>
+
+
 type Props = {
-  item?: any
-  onSubmit?: (payload: any) => void
+  item?: FpqrsItem
+  onSubmit?: (payload: FpqrsItem) => void
   readOnly?: boolean
   hideSubmit?: boolean
 }
+
+
 
 /** ===== Helpers de normalización ===== */
 const toTitle = (s?: string | null) =>
@@ -40,7 +114,7 @@ function mapStatusToEstado(status?: string | null) {
 }
 
 /** Deriva estado local conservando la estructura del formulario de Requerimiento */
-function deriveLocalStateFromItem(it: any) {
+function deriveLocalStateFromItem(it: FpqrsItem | undefined) {
   // Serv/Clasificación (acepta service|r_service para compat)
   const servicioRaw   = it?.r_service ?? it?.service
   const categoriaRaw  = it?.category
@@ -100,9 +174,17 @@ function deriveLocalStateFromItem(it: any) {
 }
 
 /** Arma el payload alineado con el backend (similar a Incidente) */
-function buildPatchPayload(item: any, v: ReturnType<typeof deriveLocalStateFromItem>) {
+function buildPatchPayload(
+  item: FpqrsItem | undefined,
+  v: ReturnType<typeof deriveLocalStateFromItem>
+): FpqrsItem {
+  // base siempre será tratado como FpqrsItem
+  const base: FpqrsItem = item ?? ({} as FpqrsItem)
+
   return {
-    ...item,
+    // Conserva todo lo que ya tenía el item original
+    ...base,
+
     // Modelo estandarizado
     r_service: v.servicio,
     category: v.categoria,
@@ -111,29 +193,43 @@ function buildPatchPayload(item: any, v: ReturnType<typeof deriveLocalStateFromI
     owner_team: v.equipo,
     urgency: v.urgencia,
 
-    // Texto/campos de solicitud
-    asunto: v.asunto,
-    symptom: v.descripcion,
+    // Texto / campos de solicitud
+    asunto:
+      typeof v.asunto === "string"
+        ? v.asunto
+        : v.asunto == null
+        ? null
+        : String(v.asunto),
+    symptom:
+      typeof v.descripcion === "string"
+        ? v.descripcion
+        : v.descripcion == null
+        ? null
+        : String(v.descripcion),
 
     // Cliente
     is_vip: v.vip,
-    nombre_cliente: v.cliente || item?.nombre_cliente,
-    correo_cliente: v.correoCliente || item?.correo_cliente,
-    empresa_cliente: v.organizacion || item?.empresa_cliente,
+    nombre_cliente: v.cliente ?? base.nombre_cliente ?? null,
+    correo_cliente: v.correoCliente ?? base.correo_cliente ?? null,
+    empresa_cliente: v.organizacion ?? base.empresa_cliente ?? null,
 
-    // Propietario/otros
-    propietario: v.propietario,
+    // Propietario / otros
+    propietario: v.propietario ?? base.propietario,
 
     // Extras informativos sin romper el esquema
     extra: {
-      ...(item?.extra ?? {}),
+      ...(base.extra ?? {}),
       nit: v.nit,
       ciudad: v.ciudad,
       direccion: v.direccion,
       telefono: v.telefono,
     },
+
+    // Adjuntos
+    adjuntos: Array.isArray(v.adjuntos) ? v.adjuntos : base.adjuntos,
   }
 }
+
 
 export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit }: Props) {
   const initial = React.useMemo(() => deriveLocalStateFromItem(item ?? {}), [item])
@@ -172,46 +268,46 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="cliente" className="text-xs text-muted-foreground">Cliente</Label>
-          <Input id="cliente" disabled={disabled} value={v.cliente} onChange={(e)=>setV(s=>({...s, cliente:e.target.value}))} />
+          <Input id="cliente" disabled={disabled} value={v.cliente ?? ""} onChange={(e)=>setV(s=>({...s, cliente:e.target.value}))} />
           <div className="text-xs text-muted-foreground">{v.correoCliente}</div>
         </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="telefono" className="text-xs text-muted-foreground">Teléfono</Label>
-          <Input id="telefono" disabled={disabled} type="tel" inputMode="tel" value={v.telefono}
+          <Input id="telefono" disabled={disabled} type="tel" inputMode="tel" value={v.telefono ?? ""}
             onChange={(e)=>setV(s=>({...s, telefono:e.target.value}))} />
         </div>
 
         <div className="flex items-center gap-3">
           <Label className="text-xs text-muted-foreground">VIP</Label>
-          <Switch disabled={disabled} checked={v.vip} onCheckedChange={(vip)=>setV(s=>({...s, vip}))} />
+          <Switch disabled={disabled} checked={v.vip ?? ""} onCheckedChange={(vip)=>setV(s=>({...s, vip}))} />
         </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="organizacion" className="text-xs text-muted-foreground">Organización</Label>
-          <Input id="organizacion" disabled={disabled} value={v.organizacion}
+          <Input id="organizacion" disabled={disabled} value={v.organizacion?? ""}
             onChange={(e)=>setV(s=>({...s, organizacion:e.target.value}))} />
         </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="nit" className="text-xs text-muted-foreground">NIT</Label>
-          <Input id="nit" disabled={disabled} value={v.nit} onChange={(e)=>setV(s=>({...s, nit:e.target.value}))} />
+          <Input id="nit" disabled={disabled} value={v.nit ?? ""} onChange={(e)=>setV(s=>({...s, nit:e.target.value}))} />
         </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="ciudad" className="text-xs text-muted-foreground">Ciudad</Label>
-          <Input id="ciudad" disabled={disabled} value={v.ciudad} onChange={(e)=>setV(s=>({...s, ciudad:e.target.value}))} />
+          <Input id="ciudad" disabled={disabled} value={v.ciudad ?? ""} onChange={(e)=>setV(s=>({...s, ciudad:e.target.value}))} />
         </div>
 
         <div className="md:col-span-2 flex flex-col gap-2">
           <Label htmlFor="direccion" className="text-xs text-muted-foreground">Dirección</Label>
-          <Input id="direccion" disabled={disabled} value={v.direccion}
+          <Input id="direccion" disabled={disabled} value={v.direccion ?? ""}
             onChange={(e)=>setV(s=>({...s, direccion:e.target.value}))} />
         </div>
 
         <div className="md:col-span-2 flex flex-col gap-2">
           <Label htmlFor="propietario" className="text-xs text-muted-foreground">Propietario</Label>
-          <Input id="propietario" disabled={disabled} value={v.propietario}
+          <Input id="propietario" disabled={disabled} value={v.propietario ?? ""}
             onChange={(e)=>setV(s=>({...s, propietario:e.target.value}))} />
         </div>
       </div>
@@ -286,13 +382,18 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="asunto" className="text-xs text-muted-foreground">Asunto</Label>
-          <Input id="asunto" disabled={disabled} value={v.asunto} onChange={(e)=>setV(s=>({...s, asunto:e.target.value}))} />
+          <Input
+            id="asunto"
+            disabled={disabled}
+            value={typeof v.asunto === "string" ? v.asunto : ""}
+            onChange={(e) => setV((s) => ({ ...s, asunto: e.target.value }))}
+          />
         </div>
 
         <div className="md:col-span-2 flex flex-col gap-2">
           <Label htmlFor="descripcion" className="text-xs text-muted-foreground">Descripción</Label>
           <Textarea id="descripcion" className="min-h-40" disabled={disabled}
-            value={v.descripcion}
+            value={typeof v.descripcion === "string" ? v.descripcion : ""}
             onChange={(e)=>setV(s=>({...s, descripcion:e.target.value}))} />
         </div>
       </div>

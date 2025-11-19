@@ -14,9 +14,59 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { opcionesITSM } from "@/components/ui/forms-proceso/opciones"
 
+export type ServiceRequestItem = {
+  id?: number
+  id_dialvox_?: string | null
+  form_name?: string | null
+  r_service?: string | null
+  category?: string | null
+  subcategory?: string | null
+  detalle?: string | null
+  symptom?: string | null
+  asunto?: string | null
+  owner_team?: string | null
+  urgency?: string | number | null
+  status?: string | null
+  source?: string | null
+
+  parameters?: Record<string, unknown> | null
+  attachments_to_delete?: unknown[] | null
+  attachments_to_upload?: unknown[] | null
+  delayed_fulfill?: boolean | null
+  save_req_state?: boolean | null
+
+  str_customer_location?: string | null
+  str_user_id?: string | null
+  subscription_id?: string | null
+  local_offset?: number | null
+
+  is_vip?: boolean | null
+  nombre_cliente?: string | null
+  correo_cliente?: string | null
+  empresa_cliente?: string | null
+
+  extra?: Record<string, unknown> | null
+
+  created_at?: string | null
+  updated_at?: string | null
+
+  // Aliases del front
+  cliente?: string | null
+  correoCliente?: string | null
+  telefono?: string | null
+  vip?: boolean | null
+  organizacion?: string | null
+  nit?: string | null
+  ciudad?: string | null
+  direccion?: string | null
+  propietario?: string | null
+  adjuntos?: unknown[]
+}
+
+
 type Props = {
-  item?: any
-  onSubmit?: (payload: any) => void
+  item?: ServiceRequestItem
+  onSubmit?: (payload: ServiceRequestItem) => void
   readOnly?: boolean
   hideSubmit?: boolean
 }
@@ -40,9 +90,9 @@ function mapStatusToEstado(status?: string | null) {
 }
 
 /** Deriva estado local conservando la estructura del formulario de Requerimiento */
-function deriveLocalStateFromItem(it: any) {
+function deriveLocalStateFromItem(it: ServiceRequestItem) {
   // Serv/Clasificación (acepta service|r_service para compat)
-  const servicioRaw   = it?.r_service ?? it?.service
+  const servicioRaw   = it?.r_service
   const categoriaRaw  = it?.category
   const subcatRaw     = it?.subcategory
   const estadoRaw     = it?.status
@@ -100,9 +150,14 @@ function deriveLocalStateFromItem(it: any) {
 }
 
 /** Arma el payload alineado con el backend (similar a Incidente) */
-function buildPatchPayload(item: any, v: ReturnType<typeof deriveLocalStateFromItem>) {
+function buildPatchPayload(
+  item: ServiceRequestItem | undefined,
+  v: ReturnType<typeof deriveLocalStateFromItem>
+): ServiceRequestItem {
+  const base = item ?? {}
+
   return {
-    ...item,
+    ...base,
     // Modelo estandarizado
     r_service: v.servicio,
     category: v.categoria,

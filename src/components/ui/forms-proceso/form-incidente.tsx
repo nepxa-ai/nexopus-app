@@ -14,16 +14,64 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { opcionesITSM } from "@/components/ui/forms-proceso/opciones"
 
+export type IncidentItem = {
+  // Claves principales
+  id?: number
+  id_dialvox_?: string | null
+
+  // Clasificación / servicio
+  service?: string | null
+  category?: string | null
+  subcategory?: string | null
+  detalle?: string | null
+  profile_link?: string | null
+
+  // Texto incidente
+  symptom?: string | null
+  subject?: string | null
+
+  // Estado / asignación
+  owner_team?: string | null
+  priority?: string | number | null
+  status?: string | null
+  source?: string | null
+  is_vip?: boolean | null
+
+  // Cliente
+  nombre_cliente?: string | null
+  correo_cliente?: string | null
+  empresa_cliente?: string | null
+
+  // Auditoría
+  created_at?: string | null
+  updated_at?: string | null
+  status_system?: string | null
+  ticket?: string | number | null
+  creado_por_user_id?: number | null
+  creado_por?: number | null
+
+  // Campos extra que usas solo en front
+  telefono?: string | null
+  nit?: string | null
+  direccion?: string | null
+  impact?: string | null
+  prioridad?: string | number | null
+  organizacion?: string | null
+  propietario?: string | null
+} & Record<string, unknown>
+
 type Props = {
-  item: any
-  onSubmit?: (payload: any) => void
+  item: IncidentItem
+  onSubmit?: (payload: IncidentItem) => void
   readOnly?: boolean          // deshabilita inputs
   hideSubmit?: boolean        // oculta botón interno
 }
 
 /** ===== Helpers de normalización ===== */
-const toTitle = (s?: string | null) =>
-  (s ?? "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())
+const toTitle = (s: unknown): string =>
+  typeof s === "string"
+    ? s.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())
+    : ""
 
 function normalizeToOption(value: string | undefined | null, options: string[], fallback: string) {
   if (!value || !String(value).trim()) return fallback
@@ -40,7 +88,7 @@ function mapStatusToEstado(status?: string | null) {
 }
 
 /** Deriva el estado local desde el item del backend */
-function deriveLocalStateFromItem(it: any) {
+function deriveLocalStateFromItem(it: IncidentItem | undefined) {
   // Soporta 'service' o 'r_service' (según tu API previa vs modelo SQLAlchemy)
   const servicioRaw = it?.r_service ?? it?.service
   const categoriaRaw = it?.category
@@ -98,10 +146,16 @@ function deriveLocalStateFromItem(it: any) {
 }
 
 /** Arma el payload para PATCH con las llaves del backend */
-function buildPatchPayload(item: any, v: ReturnType<typeof deriveLocalStateFromItem>) {
-  const payload ={
+function buildPatchPayload(
+  item: IncidentItem | undefined,
+  v: ReturnType<typeof deriveLocalStateFromItem>
+): IncidentItem {
+  // Tratamos siempre base como IncidentItem (aunque venga vacío)
+  const base = (item ?? {}) as IncidentItem
+
+  const payload: IncidentItem = {
     // Conserva todo lo que venga del backend
-    ...item,
+    ...base,
 
     // Campos del modelo:
     service: v.servicio,      // (a.k.a service)
@@ -111,33 +165,32 @@ function buildPatchPayload(item: any, v: ReturnType<typeof deriveLocalStateFromI
     status: v.estado,
     owner_team: v.equipo,
     urgency: v.urgencia,
-    // Si manejas priority paralelo, puedes incluirlo:
     priority: v.prioridad,
 
     // Texto incidente
-    subject: v.resumen,
-    symptom: v.descripcion,
+    subject:
+      typeof v.resumen === "string"
+        ? v.resumen
+        : String(v.resumen ?? base.subject ?? ""),
+
+    symptom:
+      typeof v.descripcion === "string"
+        ? v.descripcion
+        : String(v.descripcion ?? base.symptom ?? ""),
 
     // Cliente
     is_vip: v.vip,
-    nombre_cliente: v.contacto || item?.nombre_cliente,
-    correo_cliente: v.correo || item?.correo_cliente,
-    empresa_cliente: v.organizacion || item?.empresa_cliente,
-
-    // Extras informativos (si decides persistirlos)
-    //extra: {
-    //  ...(item?.extra ?? {}),
-    //  direccion: v.direccion,
-    //  telefono: v.telefono,
-    //  propietario: v.propietario,
-   // },
+    nombre_cliente: v.contacto || base.nombre_cliente,
+    correo_cliente: v.correo || base.correo_cliente,
+    empresa_cliente: v.organizacion || base.empresa_cliente,
   }
 
   console.log("PATCH payload incidente->", payload)
 
   return payload
-
 }
+
+
 
 export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: Props) {
   // Estado inicial viene del item
@@ -344,14 +397,17 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
 
         <div className="md:col-span-2 flex flex-col gap-2">
           <Label className="text-xs text-muted-foreground">Resumen</Label>
-          <Input disabled={disabled} value={v.resumen} onChange={(e) => setV((s) => ({ ...s, resumen: e.target.value }))} />
+          <Input 
+            disabled={disabled} 
+            value={typeof v.resumen === "string" ? v.resumen : ""} 
+            onChange={(e) => setV((s) => ({ ...s, resumen: e.target.value }))} />
         </div>
 
         <Label className="text-xs text-muted-foreground">Descripción</Label>
         <Textarea
           disabled={disabled}
           className="min-h-28"
-          value={v.descripcion}
+          value={typeof v.descripcion ==="string" ? v.descripcion : ""}
           onChange={(e) => setV((s) => ({ ...s, descripcion: e.target.value }))}
         />
       </div>

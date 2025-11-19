@@ -28,6 +28,12 @@ export default function AccountPage() {
       .catch(() => toast.error("No se pudo cargar tu perfil"))
   }, [])
 
+  type UpdateMePayload = {
+    nombres: string
+    apellidos: string
+    password?: string
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password && password !== password2) {
@@ -36,11 +42,12 @@ export default function AccountPage() {
     }
     setSaving(true)
     try {
-      const payload: any = { nombres, apellidos }
+      const payload: UpdateMePayload = { nombres, apellidos }
       if (password) payload.password = password
       const updated = await patchMe(payload)
       setMe(updated)
-      setPassword(""); setPassword2("")
+      setPassword("")
+      setPassword2("")
       toast.success("Perfil actualizado")
     } catch {
       toast.error("Error al actualizar")
@@ -48,6 +55,7 @@ export default function AccountPage() {
       setSaving(false)
     }
   }
+
 
   if (!me) return <div className="p-6">Cargando…</div>
 
