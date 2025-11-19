@@ -164,6 +164,7 @@ const schema = z.object({
   phone: z.string().nullable(),
   duration_sec: z.number().nullable(),
   extension: z.coerce.number().nullable(), // 👈 importante si llega "1234" como string
+  ticket_ivanti: z.string().nullable(),
   nombre_cliente: z.string().nullable(),
   numero_caso: z.string().nullable(),
   estado_caso: z.string().nullable(),
@@ -1052,6 +1053,11 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
       ),
       enableHiding: false,
       enableSorting: false,
+    },
+
+    // 1.5) ticket_ivanti 
+    { accessorKey:"ticket_ivanti", 
+      header: "Ticket ITSM" 
     },
 
 

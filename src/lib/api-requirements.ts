@@ -24,7 +24,7 @@ export async function updateRequestByDialvox(
 
 export async function sendRequestToITSM(data: unknown) {
   const r = await fetch(
-    `https://10.34.7.10:5678/n8n/webhook/crear-requerimiento-ivanti`,
+    `https://10.34.7.10:5678/n8n/webhook/actualizar-requerimiento-ivanti`,
     {
       method: "POST",
       headers: authJsonHeaders(),

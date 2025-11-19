@@ -26,7 +26,7 @@ export async function updateFPQRSByDialvox(
 
 export async function sendFPQRSToITSM(data: unknown) {
   const r = await fetch(
-    `https://10.34.7.10:5678/n8n/webhook/crear-requerimiento-ivanti`,
+    `https://10.34.7.10:5678/n8n/webhook/actualizar-fpqrs-ivanti`,
     {
       method: "POST",
       headers: authJsonHeaders(),

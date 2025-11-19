@@ -24,7 +24,7 @@ export async function updateIncidentByDialvox(
 
 export async function sendIncidentToITSM(data: unknown) {
   const r = await fetch(
-    `https://10.34.7.10:5678/n8n/webhook/crear-incidente-ivanti`,
+    `https://10.34.7.10:5678/n8n/webhook/actualizar-incidente-ivanti`,
     {
       method: "POST",
       headers: authJsonHeaders(),
