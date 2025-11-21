@@ -111,7 +111,7 @@ function deriveLocalStateFromItem(it: IncidentItem | undefined) {
   const servicio   = normalizeToOption(toTitle(servicioRaw),  opcionesITSM.servicio,   opcionesITSM.servicio[0])
   const categoria  = normalizeToOption(toTitle(categoriaRaw), opcionesITSM.categoria,  opcionesITSM.categoria[0])
   const subcategoria = normalizeToOption(toTitle(subcatRaw),  opcionesITSM.subcategoria, opcionesITSM.subcategoria[0])
-  const estado     = normalizeToOption(mapStatusToEstado(estadoRaw), opcionesITSM.estado, "Abierto")
+  const estado     = normalizeToOption(mapStatusToEstado(estadoRaw), opcionesITSM.estados_incidente, "Abierto")
   const equipo     = normalizeToOption(toTitle(equipoRaw),   opcionesITSM.equipo,    opcionesITSM.equipo[0])
   const urgencia   = normalizeToOption(String(urgenciaRaw ?? "Medio"), opcionesITSM.urgencia, "Medio")
   const impacto    = normalizeToOption(String(impactoRaw ?? "Medio"),  opcionesITSM.impacto,  "Medio")
@@ -334,7 +334,7 @@ export default function FormIncidente({ item, onSubmit, readOnly, hideSubmit }: 
           <Select value={v.estado} onValueChange={(x) => setV((s) => ({ ...s, estado: x }))} disabled={disabled}>
             <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
-              {opcionesITSM.estado.map((x) => (
+              {opcionesITSM.estados_incidente.map((x) => (
                 <SelectItem key={x} value={x}>{x}</SelectItem>
               ))}
             </SelectContent>

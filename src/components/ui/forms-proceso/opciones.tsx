@@ -252,10 +252,11 @@ export const opcionesITSM = {
     "VIRTUALIZACION",
     "WORKSTATION"
   ],
-  estado: ["Abierto", "En Progreso", "Cerrado"],
-  equipo: ["Gestores Nivel 1"],
-  urgencia: ["Bajo", "Medio", "Alto"],
-  impacto: ["Bajo", "Medio", "Alto"],
+  estados_incidente: ["Active", "Closed", "Logged", "Resolved", "Waiting for Customer"],
+  estados_requerimiento: ["Active", "Closed", "Fullfilled", "Submitted", "Waiting for Customer"],
+  equipo: ["Gestores de Nivel 1"],
+  urgencia: ["Low", "Medium", "High"],
+  impacto: ["Low", "Medium", "High"],
 }
 
 export const opcionesITSM_fpqrs = {

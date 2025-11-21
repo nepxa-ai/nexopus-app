@@ -118,7 +118,7 @@ function deriveLocalStateFromItem(it: ServiceRequestItem) {
   const servicio   = normalizeToOption(toTitle(servicioRaw),  opcionesITSM.servicio, opcionesITSM.servicio[0])
   const categoria  = normalizeToOption(toTitle(categoriaRaw), opcionesITSM.categoria, opcionesITSM.categoria[0])
   const subcategoria = normalizeToOption(toTitle(subcatRaw),  opcionesITSM.subcategoria, opcionesITSM.subcategoria[0])
-  const estado     = normalizeToOption(mapStatusToEstado(estadoRaw), opcionesITSM.estado, "Abierto")
+  const estado     = normalizeToOption(mapStatusToEstado(estadoRaw), opcionesITSM.estados_requerimiento, "Abierto")
   const equipo     = normalizeToOption(toTitle(equipoRaw),   opcionesITSM.equipo, opcionesITSM.equipo[0])
   const urgencia   = normalizeToOption(String(urgenciaRaw ?? "Medio"), opcionesITSM.urgencia, "Medio")
 
@@ -325,7 +325,7 @@ export default function FormRequerimiento({ item, onSubmit, readOnly, hideSubmit
           <Select value={v.estado} onValueChange={(estado)=>setV(s=>({...s, estado}))} disabled={disabled}>
             <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
-              {opcionesITSM.estado.map((x)=>(<SelectItem key={x} value={x}>{x}</SelectItem>))}
+              {opcionesITSM.estados_requerimiento.map((x)=>(<SelectItem key={x} value={x}>{x}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>

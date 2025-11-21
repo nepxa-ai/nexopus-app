@@ -339,7 +339,7 @@ function IncidentDialog({ row, onAfterChange }: { row: RowType; onAfterChange?: 
             {/* Título */}
             <DialogHeader className="p-0">
               <DialogTitle className="text-lg font-semibold">
-                Requerimiento · {headerText}
+                Incidente · {headerText}
               </DialogTitle>
             </DialogHeader>
 
