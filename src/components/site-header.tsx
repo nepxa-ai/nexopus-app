@@ -16,7 +16,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
             <a
-              href="https://github.com/nepxa-ai/Nexopus-OG-Creacion-Automatica-Ivanti-docs"
+              href="https://nepxa-ai.github.io/Nexopus-OG-Creacion-Automatica-Ivanti-docs/"
               rel="noopener noreferrer"
               target="_blank"
               className="flex items-center gap-1 dark:text-foreground"
