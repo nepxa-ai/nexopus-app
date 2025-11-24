@@ -124,7 +124,7 @@ export function AuditLogByDialvox({ items }: Props) {
                   value={String(id_dialvox)}
                   className="border rounded-md px-3"
                 >
-                  <AccordionTrigger className="flex justify-between gap-4">
+                  <AccordionTrigger className="flex items-center justify-between gap-4 py-3 min-h-[64px]">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
                         {groupItems.length}
@@ -148,9 +148,6 @@ export function AuditLogByDialvox({ items }: Props) {
                           <TableHead>ID Job n8n</TableHead>
                           <TableHead>Workflow</TableHead>
                           <TableHead>Estado</TableHead>
-                          <TableHead className="w-[180px]">
-                            Fecha / Hora
-                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -174,11 +171,6 @@ export function AuditLogByDialvox({ items }: Props) {
                                   <Badge variant={estadoView.variant}>
                                     {estadoView.label}
                                   </Badge>
-                                </TableCell>
-                                <TableCell className="text-xs text-muted-foreground">
-                                  {item.created_at
-                                    ? new Date(item.created_at).toLocaleString()
-                                    : "—"}
                                 </TableCell>
                               </TableRow>
                             );

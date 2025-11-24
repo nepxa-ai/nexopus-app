@@ -7,8 +7,9 @@ import {
   IconDashboard,
   IconUsers,
   IconLibrary,
-  IconBrain
-
+  IconBrain,
+  IconAutomaticGearbox,
+  IconProgress,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -101,8 +102,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link href="/jobs">
-                    <IconBrain className="size-4" />
-                    <span>Jobs nexopus(Ejecusiones)</span>
+                    <IconProgress className="size-4" />
+                    <span>Jobs nexopus(Ejecuciones)</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
