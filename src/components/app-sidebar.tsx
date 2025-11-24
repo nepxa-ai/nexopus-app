@@ -7,6 +7,8 @@ import {
   IconDashboard,
   IconUsers,
   IconLibrary,
+  IconBrain
+
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -93,6 +95,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Link href="/catalog">
                     <IconLibrary className="size-4" />
                     <span>Administrar catalogo (Servicios, Categoria, Subcategoria)</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/jobs">
+                    <IconBrain className="size-4" />
+                    <span>Jobs nexopus(Ejecusiones)</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
