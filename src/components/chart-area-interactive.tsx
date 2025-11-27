@@ -133,6 +133,30 @@ export function ChartBarStacked() {
             {timeRange === "90d" ? "3 meses" : timeRange === "30d" ? "30 días" : "7 días"}
           </span>
         </CardDescription>
+         {/*Leyenda centrada arriba del gráfico*/}
+        <div className="w-full flex justify-center mt-2 mb-1">
+          <div className="flex items-center gap-4 text-xs sm:text-sm">
+            <div className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-sm" style={{ background: "var(--chart-1a)" }}></span>
+              <span>Incidentes</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-sm" style={{ background: "var(--chart-2a)" }}></span>
+              <span>Requerimientos</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-sm" style={{ background: "var(--chart-3a)" }}></span>
+              <span>FPQRS</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded-sm" style={{ background: "var(--chart-5a)" }}></span>
+              <span>Consulta caso</span>
+            </div>
+          </div>
+        </div>
         <CardAction>
           <ToggleGroup
             type="single"
