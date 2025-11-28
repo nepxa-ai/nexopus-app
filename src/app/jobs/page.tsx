@@ -22,7 +22,7 @@ export default function JobsPage() {
 
   // 1️⃣ Verificar rol admin
   React.useEffect(() => {
-    fetchMe()
+    fetchAuthMe()
       .then((me) => {
         if (me?.rol !== "admin") {
           router.replace("/");
