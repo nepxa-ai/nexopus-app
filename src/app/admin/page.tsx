@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { fetchMe } from "@/lib/api-auth";
+import { fetchAuthMe } from "@/lib/api-auth";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -16,7 +16,7 @@ export default function AdminPage() {
   React.useEffect(() => {
 
     // Verifica rol admin
-    fetchMe()
+    fetchAuthMe()
       .then((me) => {
         if (me?.rol !== "admin") {
           router.replace("/"); // o "/403" si tienes página de prohibido

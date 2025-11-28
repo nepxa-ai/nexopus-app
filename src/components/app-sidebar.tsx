@@ -26,7 +26,7 @@ import {
   SidebarGroupLabel,
 } from "@/components/ui/sidebar"
 
-import { fetchMe } from "@/lib/api-auth"
+import { fetchAuthMe } from "@/lib/api-auth"
 
 type NavUserShape = { name: string; email: string; avatar: string }
 
@@ -36,7 +36,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   React.useEffect(() => {
 
-    fetchMe()
+    fetchAuthMe()
       .then((u) => {
         const name = [u.nombres, u.apellidos].filter(Boolean).join(" ") || "Usuario"
         setNavUser({ name, email: u.email, avatar: "/avatars/shadcn.jpg" })

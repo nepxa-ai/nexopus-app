@@ -1,4 +1,13 @@
 // src/lib/api-users.ts
+
+//Funciones - responsable de :
+//1. Manejar aquí todo lo relacionado a usuario y perfil de usuario (/users/me)
+//2. La función utilitaria fetchUserByExtensionLite
+//3. Importar la capa de auth
+
+import { API_URL, authHeaders, authJsonHeaders } from "./api-auth"
+
+
 export type UserLite = {
   id: number
   nombres: string
@@ -6,30 +15,28 @@ export type UserLite = {
   extension: number
 }
 
+/**
+ * Devuelve info básica de un usuario por extensión (para mostrar nombre, etc.).
+ */
 export async function fetchUserByExtensionLite(ext: number): Promise<UserLite | null> {
   console.log("[DEBUG] fetchUserByExtensionLite called with ext:", ext)
 
   if (ext === -1) return { id: 0, nombres: "No asignado", apellidos: "", extension: -1 }
   if (ext == null || ext <= 0) return null
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
 
   const res = await fetch(`api/users/by-extension/${ext}/lite`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: authHeaders(),
     cache: "no-store",
-  }).catch(err => {
-    console.error("[DEBUG] Fetch error:", err)
-    return null
   })
 
-  if (!res || !res.ok) {
-    console.warn("[DEBUG] Response not OK for ext:", ext, res?.status)
-    return null
+  if (!res.ok) {
+    if (res.status === 404) return null
+    throw new Error(
+      `Error al buscar usuario por extensión (HTTP ${res.status})`
+    )
   }
-
-  const data = await res.json()
-  console.log("[DEBUG] Response OK:", data)
-  return data
+  return res.json()
 }
 
 /* ---------- NUEVO: perfil propio ---------- */
@@ -52,9 +59,8 @@ export type MeUpdatePayload = {
 }
 
 export async function fetchMe(): Promise<Me> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
   const res = await fetch(`/api/users/me`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: authHeaders(),
     cache: "no-store",
     credentials: "include",
   })

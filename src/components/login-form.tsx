@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { apiLogin, fetchMe } from "@/lib/api-auth";;
+import { apiLogin, fetchAuthMe } from "@/lib/api-auth";;
 import { recuperarContrasena } from "@/lib/api-recuperacion";
 
 import Image from "next/image";
@@ -31,7 +31,7 @@ async function onSubmit(e: React.FormEvent) {
     setLoading(true);
     try {
       await apiLogin(email, password);
-      await fetchMe();
+      await fetchAuthMe();
       router.push("/dashboard");
     } catch (err: unknown) {
       const msg =

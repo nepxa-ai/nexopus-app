@@ -1,9 +1,17 @@
 // lib/api-auth.ts
+
+//Funciones - responsable de :
+//1. Hacer el proceso de login
+//2. Guardar el token después del login
+//3. Leer el token desde localStorage
+//4. Armar headers (authHeaders / authJsonHeaders)
+//5. Validar sesión con /auth/me → fetchAuthMe
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api" || "http://localhost:8000";
 
 
 export function authHeaders(json: boolean = false): HeadersInit {
-  // En SSR / build no hay localStorage
+
   if (typeof window === "undefined") {
     const base: Record<string, string> = {}
     if (json) base["Content-Type"] = "application/json"
@@ -59,13 +67,26 @@ export async function apiLogin(email: string, password: string) {
   return data
 }
 
+
+/*
+ * Elimina el token local (logout básico del front).
+ */
+export function logout() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("access_token")
+  }
+}
+
 /**
  * GET /auth/me  → usuario actual
+ * valida el token y devuelve info básica del usuario.
+ * Úsalo para saber si hay sesión válida (guards, layout, etc).
  */
-export async function fetchMe() {
+export async function fetchAuthMe() {
   const res = await fetch(`${API_URL}/auth/me`, {
     headers: authHeaders(),
     cache: "no-store",
+    credentials: "include",
   })
 
   if (!res.ok) {
