@@ -91,7 +91,7 @@ import FormFPQRS, {
   type FpqrsItem,
 } from "@/components/ui/forms-proceso/form-fpqrs"
 
-
+import { TableToolbar } from "./table-toolbar";
 // ============================
 // Utils
 // ============================
@@ -164,6 +164,10 @@ const schema = z.object({
   phone: z.string().nullable(),
   duration_sec: z.number().nullable(),
   extension: z.coerce.number().nullable(), // 👈 importante si llega "1234" como string
+  
+  estado_llamada: z.number().nullable(),
+  estado_llamada_label: z.string().nullable(),
+  
   ticket_ivanti: z.string().nullable(),
   nombre_cliente: z.string().nullable(),
   numero_caso: z.string().nullable(),
@@ -1099,9 +1103,8 @@ function getColumns(refetch: () => Promise<void>): ColumnDef<RowType>[] {
     },
 
     // 3) Estado (placeholder)
-    { id: "estado", 
-      header: "Estado", 
-      cell: () => <span className="text-muted-foreground">—</span>
+    { accessorKey: "estado_llamada_label", 
+      header: "Estado",       
     },
 
     // 4) Extensión asignada
@@ -1267,9 +1270,9 @@ function Toolbar({
   showServerFilters?: boolean
   }) {
   const searchCol = table.getColumn("search")
-  const startedCol = table.getColumn("started_at")
+  //const startedCol = table.getColumn("started_at")
   const vipCol = table.getColumn("es_vip")
-  const horarioCol = table.getColumn("en_horario")
+  //const horarioCol = table.getColumn("en_horario")
 
   return (
     <div className="w-full flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-4 lg:px-6">
@@ -1525,13 +1528,13 @@ React.useEffect(() => {
 
   return (
     <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
-      {/*
+      
       <Toolbar
         table={table}
         serverFilters={serverFilters}
         onServerFilters={setServerFilters}
         showServerFilters
-      /> */}
+      />
 
       <TabsContent value="outline" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">

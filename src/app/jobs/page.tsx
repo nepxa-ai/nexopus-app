@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-import { fetchMe } from "@/lib/api-auth";
+import { fetchAuthMe } from "@/lib/api-auth";
 import { getExecutions, type ExecutionItem } from "@/lib/api-jobs";
 import { AuditLogByDialvox } from "@/components/jobs/jobs-by-dialvox";
 

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { fetchMe } from "@/lib/api-auth";
+import { fetchAuthMe } from "@/lib/api-auth";
 
 import ITSMAdminTabs from "@/components/itsm-catalog/itsm-catalog";
 
@@ -16,7 +16,7 @@ export default function CatalogPage() {
 
   React.useEffect(() => {
 
-    fetchMe()
+    fetchAuthMe()
       .then((me) => {
         // si quieres limitar al rol admin, deja esta validación:
         if (me?.rol !== "admin") {
