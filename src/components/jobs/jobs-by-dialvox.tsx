@@ -50,7 +50,7 @@ function estadoBadgeVariant(estado: Estado): { label: string; variant: "default"
     case "error":
       return { label: "Error", variant: "destructive" };
     case "running":
-      return { label: "Running", variant: "outline" };
+      return { label: "Success", variant: "outline" }; //CAMBIAR
     case "waiting":
       return { label: "Waiting", variant: "outline" };
     case "canceled":
